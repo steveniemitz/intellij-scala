@@ -168,6 +168,7 @@ object ScalaColorSchemeAnnotator {
     createInfoAnnotation(refElement.nameId, attributes)
   }
 
+  //See tests in [[org.jetbrains.plugins.scala.annotator.CollectionByTypeAnnotatorTestBase]]
   private def annotateCollectionType(
     refElement: ScReference,
     resolvedElement: => PsiElement

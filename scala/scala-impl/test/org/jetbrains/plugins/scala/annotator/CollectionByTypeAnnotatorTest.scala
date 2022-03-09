@@ -13,23 +13,23 @@ import org.junit.Assert.assertEquals
 
 import scala.collection.immutable.ListSet
 
-class TypeCollectionAnotatorTest_Scala_2_10 extends TypeCollectionAnotatorTestCommonTests {
+class CollectionByTypeAnnotatorTest_Scala_2_10 extends CollectionByTypeAnnotatorTestCommonTests {
   override protected def supportedIn(version: ScalaVersion): Boolean = version == ScalaVersion.Latest.Scala_2_10
 }
-class TypeCollectionAnotatorTest_Scala_2_11 extends TypeCollectionAnotatorTestCommonTests {
+class CollectionByTypeAnnotatorTest_Scala_2_11 extends CollectionByTypeAnnotatorTestCommonTests {
   override protected def supportedIn(version: ScalaVersion): Boolean = version == ScalaVersion.Latest.Scala_2_11
 }
-class TypeCollectionAnotatorTest_Scala_2_12 extends TypeCollectionAnotatorTestCommonTests {
+class CollectionByTypeAnnotatorTest_Scala_2_12 extends CollectionByTypeAnnotatorTestCommonTests {
   override protected def supportedIn(version: ScalaVersion): Boolean = version == ScalaVersion.Latest.Scala_2_12
 }
-class TypeCollectionAnotatorTest_Scala_2_13 extends TypeCollectionAnotatorTestCommonTests {
+class CollectionByTypeAnnotatorTest_Scala_2_13 extends CollectionByTypeAnnotatorTestCommonTests {
   override protected def supportedIn(version: ScalaVersion): Boolean = version == ScalaVersion.Latest.Scala_2_13
 }
-class TypeCollectionAnotatorTest_Scala_3 extends TypeCollectionAnotatorTestCommonTests {
+class CollectionByTypeAnnotatorTest_Scala_3 extends CollectionByTypeAnnotatorTestCommonTests {
   override protected def supportedIn(version: ScalaVersion): Boolean = version == ScalaVersion.Latest.Scala_3
 }
 
-abstract class TypeCollectionAnotatorTestCommonTests extends TypeCollectionAnotatorTestBase {
+abstract class CollectionByTypeAnnotatorTestCommonTests extends CollectionByTypeAnnotatorTestBase {
 
   def testAnnotateImmutable_NonQualified(): Unit = {
     val text =
@@ -504,7 +504,7 @@ abstract class TypeCollectionAnotatorTestCommonTests extends TypeCollectionAnota
   }
 }
 
-abstract class TypeCollectionAnotatorTestBase extends ScalaLightCodeInsightFixtureTestAdapter {
+abstract class CollectionByTypeAnnotatorTestBase extends ScalaLightCodeInsightFixtureTestAdapter {
   protected val immutableCollectionMessage = ScalaBundle.message("scala.immutable.collection")
   protected val mutableCollectionMessage = ScalaBundle.message("scala.mutable.collection")
   protected val javaCollectionMessage = ScalaBundle.message("java.collection")
