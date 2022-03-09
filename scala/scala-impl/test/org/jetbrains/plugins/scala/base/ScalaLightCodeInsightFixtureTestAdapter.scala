@@ -1,5 +1,4 @@
-package org.jetbrains.plugins.scala
-package base
+package org.jetbrains.plugins.scala.base
 
 import com.intellij.application.options.CodeStyle
 import com.intellij.codeInsight.daemon.impl.HighlightInfo
@@ -17,10 +16,11 @@ import com.intellij.psi.codeStyle.{CodeStyleSettings, CommonCodeStyleSettings}
 import com.intellij.psi.{PsiDocumentManager, PsiFile}
 import com.intellij.testFramework.fixtures.{JavaCodeInsightTestFixture, LightJavaCodeInsightFixtureTestCase}
 import com.intellij.testFramework.{EditorTestUtil, LightPlatformTestCase, LightProjectDescriptor}
-import junit.framework.TestCase
-import org.jetbrains.plugins.scala.extensions.{inWriteCommandAction, invokeAndWait}
+import org.jetbrains.plugins.scala.extensions.{inWriteAction, inWriteCommandAction, invokeAndWait}
 import org.jetbrains.plugins.scala.lang.formatting.settings.ScalaCodeStyleSettings
 import org.jetbrains.plugins.scala.settings.ScalaApplicationSettings
+import org.jetbrains.plugins.scala.util.TestUtils
+import org.jetbrains.plugins.scala.{ScalaFileType, ScalaLanguage, TestFixtureProvider}
 import org.junit.Assert.{assertEquals, assertNotNull, fail}
 
 import scala.jdk.CollectionConverters._
@@ -46,7 +46,7 @@ abstract class ScalaLightCodeInsightFixtureTestAdapter
 
   override final def getFixture: JavaCodeInsightTestFixture = myFixture
 
-  override def getTestDataPath: String = util.TestUtils.getTestDataPath + "/"
+  override def getTestDataPath: String = TestUtils.getTestDataPath + "/"
 
   protected def loadScalaLibrary: Boolean = true
 
@@ -80,22 +80,25 @@ abstract class ScalaLightCodeInsightFixtureTestAdapter
     configureFromFileText(ScalaFileType.INSTANCE, fileText)
 
   protected def configureFromFileText(fileType: FileType, fileText: String): PsiFile = {
-    val file = getFixture.configureByText(fileType, normalize(fileText))
+    val file = getFixture.configureByText(fileType, normalizeFileText(fileText))
     assertNotNull(file)
     file
   }
 
   protected def configureFromFileTextWithSomeName(fileType: String, fileText: String): PsiFile = {
-    val file = getFixture.configureByText("Test." + fileType, normalize(fileText))
+    val file = getFixture.configureByText("Test." + fileType, normalizeFileText(fileText))
     assertNotNull(file)
     file
   }
 
   protected def configureFromFileText(fileName: String, fileText: String): PsiFile = {
-    val file = getFixture.configureByText(fileName: String, normalize(fileText))
+    val file = getFixture.configureByText(fileName: String, normalizeFileText(fileText))
     assertNotNull(file)
     file
   }
+
+  protected def normalizeFileText(fileText: String): String =
+    normalize(fileText)
 
   protected def getEditorOffset: Int = getEditor.getCaretModel.getOffset
 
@@ -119,21 +122,30 @@ abstract class ScalaLightCodeInsightFixtureTestAdapter
   }
 
   protected def checkHasErrorAroundCaret(text: String): Unit = {
-    val normalizedText = normalize(text)
+    val normalizedText = normalizeFileText(text)
     myFixture.configureByText("dummy.scala", normalizedText)
     val caretIndex = normalizedText.indexOf(CARET)
 
-    def isAroundCaret(info: HighlightInfo) = caretIndex == -1 || new TextRange(info.getStartOffset, info.getEndOffset).contains(caretIndex)
-    val infos = myFixture.doHighlighting().asScala
+    def isAroundCaret(info: HighlightInfo): Boolean = caretIndex == -1 || new TextRange(info.getStartOffset, info.getEndOffset).contains(caretIndex)
+
+    val infos: Seq[HighlightInfo] = myFixture.doHighlighting().asScala.toSeq
 
     val warnings = infos.filter(i => StringUtil.isNotEmpty(i.getDescription) && isAroundCaret(i))
 
     if (shouldPass) {
-      assert(warnings.nonEmpty, "No highlightings found")
+      if (warnings.isEmpty) {
+        val message =
+          if (infos.isEmpty) "No highlightings found"
+          else s"No matching highlightings found. All highlightings:\n${infos.map(highlightingInfoDebugString).mkString("\n")}"
+        fail(message)
+      }
     } else if (warnings.nonEmpty) {
       failingTestPassed()
     }
   }
+
+  private def highlightingInfoDebugString(info: HighlightInfo): String =
+    info.toString
 
   protected def checkCaretOffsets(
     expectedCarets: Seq[Int],

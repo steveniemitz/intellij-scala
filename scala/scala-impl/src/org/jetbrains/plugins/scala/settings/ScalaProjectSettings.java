@@ -116,7 +116,7 @@ public class ScalaProjectSettings implements PersistentStateComponent<ScalaProje
   public enum TypeChecker {BuiltIn, Compiler}
 
   // https://youtrack.jetbrains.com/issue/SCL-19928
-  enum AliasExportSemantics {
+  public enum AliasExportSemantics {
     Definition, // Seq is scala.Seq
     Export // Seq is scala.collection.immutable.Seq
   }
@@ -382,11 +382,11 @@ public class ScalaProjectSettings implements PersistentStateComponent<ScalaProje
     TYPE_AWARE_HIGHLIGHTING_ENABLED = !TYPE_AWARE_HIGHLIGHTING_ENABLED;
   }
 
-  AliasExportSemantics getAliasSemantics() {
+  public AliasExportSemantics getAliasSemantics() {
     return ALIAS_EXPORT_SEMANTICS;
   }
 
-  void setAliasSemantics(AliasExportSemantics semantics) {
+  public void setAliasSemantics(AliasExportSemantics semantics) {
     ALIAS_EXPORT_SEMANTICS = semantics;
   }
 

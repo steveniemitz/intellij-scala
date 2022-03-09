@@ -8,14 +8,11 @@ import org.jetbrains.plugins.scala.extensions.IterableOnceExt
 
 import scala.annotation.nowarn
 
-/**
- * Pavel.Fatin, 18.05.2010
- */
-
 class AnnotatorHolderMock(file: PsiFile) extends AnnotatorHolderMockBase[Message](file) {
 
   def errorAnnotations: List[Error] = annotations.filterByType[Error]
 
+  @nowarn("cat=deprecation")
   private val severityMapping: Map[HighlightSeverity, (String, String) => Message] =
     Map(
       HighlightSeverity.ERROR -> Error.apply,
@@ -23,15 +20,30 @@ class AnnotatorHolderMock(file: PsiFile) extends AnnotatorHolderMockBase[Message
       HighlightSeverity.WEAK_WARNING -> Warning.apply,
       HighlightSeverity.INFORMATION -> Info.apply,
       HighlightSeverity.INFO -> Info.apply
-    ): @nowarn("cat=deprecation")
-
-  private def textOf(range: TextRange): String =
-    getCurrentAnnotationSession.getFile.getText
-      .substring(range.getStartOffset, range.getEndOffset)
+    )
 
   override def createMockAnnotation(severity: HighlightSeverity, range: TextRange, message: String): Option[Message] = {
     val transformer = severityMapping.get(severity)
-    transformer.map(_.apply(textOf(range), message))
+    transformer.map(_.apply(fileTextOf(range), message))
+  }
+}
+
+
+class AnnotatorHolderWithRangeMock(file: PsiFile) extends AnnotatorHolderMockBase[MessageWithRange](file) {
+
+  @nowarn("cat=deprecation")
+  private val severityMapping: Map[HighlightSeverity, (TextRange, String, String) => MessageWithRange] =
+    Map(
+      HighlightSeverity.ERROR -> MessageWithRange.Error.apply,
+      HighlightSeverity.WARNING -> MessageWithRange.Warning.apply,
+      HighlightSeverity.WEAK_WARNING -> MessageWithRange.Warning.apply,
+      HighlightSeverity.INFORMATION -> MessageWithRange.Info.apply,
+      HighlightSeverity.INFO -> MessageWithRange.Info.apply
+    )
+
+  override def createMockAnnotation(severity: HighlightSeverity, range: TextRange, message: String): Option[MessageWithRange] = {
+    val transformer = severityMapping.get(severity)
+    transformer.map(_.apply(range, fileTextOf(range), message))
   }
 }
 
@@ -43,6 +55,7 @@ abstract class AnnotatorHolderMockBase[T](file: PsiFile) extends ScalaAnnotation
 
   def createMockAnnotation(severity: HighlightSeverity, range: TextRange, message: String): Option[T]
 
+  //noinspection ApiStatus,UnstableApiUsage
   override def getCurrentAnnotationSession: AnnotationSession = new AnnotationSession(file)
 
   override def isBatchMode: Boolean = false
@@ -58,5 +71,10 @@ abstract class AnnotatorHolderMockBase[T](file: PsiFile) extends ScalaAnnotation
 
     override def onCreate(severity: HighlightSeverity, message: String, range: TextRange): Unit =
       myAnnotations :::= createMockAnnotation(severity, range, message).toList
+  }
+
+  protected def fileTextOf(range: TextRange): String = {
+    val fileText = getCurrentAnnotationSession.getFile.getText
+    fileText.substring(range.getStartOffset, range.getEndOffset)
   }
 }

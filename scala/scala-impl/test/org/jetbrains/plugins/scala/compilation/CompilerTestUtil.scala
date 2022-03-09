@@ -144,7 +144,7 @@ object CompilerTestUtil {
   def withModifiedRegistryValue(key: String, newValue: Int): RevertableChange =
     withModifiedRegistryValueInternal[Int](key, newValue, _.asInteger(), _ setValue _)
 
-  private def withModifiedSetting[A](getter: =>A, setter: A=>Unit, newValue: A): RevertableChange =
+  def withModifiedSetting[A](getter: =>A, setter: A=>Unit, newValue: A): RevertableChange =
     new RevertableChange {
       private var before: Option[A] = None
 
@@ -184,7 +184,7 @@ object CompilerTestUtil {
   def withErrorsFromCompilerDisabled(project: Project): RevertableChange =
     withErrorsFromCompiler(project, enabled = false)
 
-  def withModifiedSetting[Settings, T](instance: => Settings)
+  def withModifiedSetting2[Settings, T](instance: => Settings)
                                       (value: T)
                                       (get: Settings => T, set: (Settings, T) => Unit): RevertableChange = new RevertableChange {
     private var before: Option[T] = None

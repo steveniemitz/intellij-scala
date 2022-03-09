@@ -2,7 +2,7 @@ package org.jetbrains.plugins.scala.lang.actions.editor.enter
 
 import junit.framework.Test
 import org.jetbrains.plugins.scala.base.EditorActionTestBase
-import org.jetbrains.plugins.scala.compilation.CompilerTestUtil.withModifiedSetting
+import org.jetbrains.plugins.scala.compilation.CompilerTestUtil.withModifiedSetting2
 import org.jetbrains.plugins.scala.lang.formatting.settings.ScalaCodeStyleSettings
 
 trait Scala2AndScala3EnterActionCommonTests extends Test {
@@ -195,7 +195,7 @@ trait Scala2AndScala3EnterActionCommonTests extends Test {
   }
 
   def testInExtendsList_AfterExtendsAndWith_AlignExtendsAndWithSettingEnabled(): Unit = {
-    withModifiedSetting(getScalaSettings)(ScalaCodeStyleSettings.ALIGN_TO_EXTENDS)(_.ALIGN_EXTENDS_WITH, _.ALIGN_EXTENDS_WITH = _) {
+    withModifiedSetting2(getScalaSettings)(ScalaCodeStyleSettings.ALIGN_TO_EXTENDS)(_.ALIGN_EXTENDS_WITH, _.ALIGN_EXTENDS_WITH = _) {
       checkGeneratedTextAfterEnter(
         s"""abstract class A
            |  extends B$CARET

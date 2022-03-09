@@ -1,14 +1,16 @@
-package org.jetbrains.plugins.scala
-package highlighter
+package org.jetbrains.plugins.scala.highlighter
 
+import com.intellij.codeInspection.util.InspectionMessage
 import com.intellij.lang.annotation.{AnnotationHolder, Annotator, HighlightSeverity}
 import com.intellij.openapi.editor.DefaultLanguageHighlighterColors
 import com.intellij.openapi.editor.colors.TextAttributesKey
 import com.intellij.psi._
 import org.jetbrains.annotations.Nls
+import org.jetbrains.plugins.scala.ScalaBundle
 import org.jetbrains.plugins.scala.annotator.ScalaAnnotationHolder
 import org.jetbrains.plugins.scala.annotator.annotationHolder.ScalaAnnotationHolderAdapter
 import org.jetbrains.plugins.scala.extensions._
+import org.jetbrains.plugins.scala.highlighter.ScalaColorSchemeAnnotator._
 import org.jetbrains.plugins.scala.lang.lexer.ScalaTokenTypes
 import org.jetbrains.plugins.scala.lang.psi.api.base._
 import org.jetbrains.plugins.scala.lang.psi.api.base.patterns._
@@ -20,7 +22,6 @@ import org.jetbrains.plugins.scala.lang.psi.api.toplevel.templates.ScTemplateBod
 import org.jetbrains.plugins.scala.lang.psi.api.toplevel.typedef.{ScClass, ScMember, ScObject, ScTrait}
 import org.jetbrains.plugins.scala.lang.psi.api.toplevel.{ScEarlyDefinitions, ScModifierListOwner}
 import org.jetbrains.plugins.scala.lang.psi.impl.ScalaStubBasedElementImpl
-import org.jetbrains.plugins.scala.lang.psi.types.api.FunctionType
 import org.jetbrains.plugins.scala.lang.psi.types.{ScType, ScTypeExt, ScalaType, TypePresentationContext}
 import org.jetbrains.plugins.scala.lang.refactoring.util.ScalaNamesUtil
 import org.jetbrains.plugins.scala.project.ProjectContext
@@ -29,11 +30,9 @@ import org.jetbrains.plugins.scala.settings.ScalaProjectSettings.ScalaCollection
 import org.jetbrains.plugins.scala.statistics.{FeatureKey, Stats}
 
 /**
-  * User: Alexander Podkhalyuzin
-  * Date: 17.07.2008
-  */
-class ScalaColorSchemeAnnotator extends Annotator {
-  import ScalaColorSchemeAnnotator._
+ * see also org.jetbrains.plugins.scala.codeInsight.daemon.ScalaRainbowVisitor
+ */
+final class ScalaColorSchemeAnnotator extends Annotator {
 
   override def annotate(element: PsiElement, holder: AnnotationHolder): Unit = {
     highlightElement(element)(new ScalaAnnotationHolderAdapter(holder))
@@ -57,15 +56,18 @@ object ScalaColorSchemeAnnotator {
     }
   }
 
-  def highlightReferenceElement(refElement: ScReference)(implicit holder: ScalaAnnotationHolder): Unit = {
-    annotateCollectionType(refElement)
+  private def highlightReferenceElement(refElement: ScReference)(implicit holder: ScalaAnnotationHolder): Unit = {
+    val multiResolveResult = refElement.multiResolveScala(false)
+    lazy val resolvedElement =
+      if (multiResolveResult.length == 1) multiResolveResult.head.getActualElement
+      else null
+
+    annotateCollectionType(refElement, resolvedElement)
 
     val project: ProjectContext = refElement.projectContext
 
     if (refElement.parentOfType(classOf[ScConstructorInvocation], strict = false)
       .exists(_.getParent.is[ScAnnotationExpr])) return
-
-    val resolvedElement = refElement.resolve()
 
     val QualNameToType = project.stdTypes.QualNameToType
 
@@ -76,7 +78,7 @@ object ScalaColorSchemeAnnotator {
         DefaultHighlighter.ABSTRACT_CLASS
       case _: ScTypeParam =>
         DefaultHighlighter.TYPEPARAM
-      case x: ScTypeAlias =>
+      case _: ScTypeAlias =>
         DefaultHighlighter.TYPE_ALIAS
       case _: ScClass if referenceIsToCompanionObjectOfClass(refElement) =>
         DefaultHighlighter.OBJECT
@@ -122,7 +124,8 @@ object ScalaColorSchemeAnnotator {
             DefaultHighlighter.PATTERN
           case _: ScGenerator | _: ScForBinding =>
             DefaultHighlighter.GENERATOR
-          case _ => DefaultLanguageHighlighterColors.IDENTIFIER
+          case _ =>
+            DefaultLanguageHighlighterColors.IDENTIFIER
         }
       case x: PsiField =>
         if (!x.hasModifierProperty("final")) DefaultHighlighter.VARIABLES
@@ -165,34 +168,40 @@ object ScalaColorSchemeAnnotator {
     createInfoAnnotation(refElement.nameId, attributes)
   }
 
-  private def annotateCollectionType(refElement: ScReference)(implicit holder: ScalaAnnotationHolder): Unit = {
+  private def annotateCollectionType(
+    refElement: ScReference,
+    resolvedElement: => PsiElement
+  )(implicit holder: ScalaAnnotationHolder): Unit = {
     def annotateCollectionByType(resolvedType: ScType): Unit = {
       val resolvedTypeName = resolvedType.presentableText(TypePresentationContext.emptyContext)
-      if (ScalaNamesUtil.isOperatorName(
-        resolvedTypeName.substring(0, resolvedTypeName.segmentLength(_ != '.')))) return
+
+      val isOperator = ScalaNamesUtil.isOperatorName(resolvedTypeName.substring(0, resolvedTypeName.segmentLength(_ != '.')))
+      if (isOperator)
+        return
 
       val scalaProjectSettings: ScalaProjectSettings = ScalaProjectSettings.getInstance(refElement.getProject)
 
-      scalaProjectSettings.getCollectionTypeHighlightingLevel match {
-        case ScalaCollectionHighlightingLevel.None                           => return
+      val scalaCollectionTypeHighlightingLevel = scalaProjectSettings.getCollectionTypeHighlightingLevel
+      scalaCollectionTypeHighlightingLevel match {
+        case ScalaCollectionHighlightingLevel.None                           =>
+          return
         case ScalaCollectionHighlightingLevel.OnlyNonQualified =>
           refElement.qualifier match {
             case None =>
-            case _ => return
+            case _ =>
+              return
           }
         case ScalaCollectionHighlightingLevel.All =>
       }
 
       Stats.trigger(FeatureKey.collectionPackHighlighting)
 
-      def conformsByNames(tp: ScType, qn: List[String]): Boolean =
-        qn.flatMap {
-          refElement.elementScope.getCachedClass(_)
-        }.map {
-          ScalaType.designator
-        }.exists {
-          tp.conforms
-        }
+      def conformsByNames(tp: ScType, fqns: List[String]): Boolean = {
+        val cachedClasses = fqns.flatMap(refElement.elementScope.getCachedClass)
+        val types = cachedClasses.map(ScalaType.designator)
+        val typesConforming = types.exists(tp.conforms)
+        typesConforming
+      }
 
       def simpleAnnotate(@Nls annotationText: String, annotationAttributes: TextAttributesKey): Unit = {
         if (SCALA_FACTORY_METHODS_NAMES.contains(refElement.nameId.getText)) {
@@ -201,62 +210,46 @@ object ScalaColorSchemeAnnotator {
         createInfoAnnotation(refElement.nameId, annotationAttributes, annotationText)
       }
 
-      val text = resolvedType.canonicalText
-      if (text == null) return
+      val typeText = resolvedType.canonicalText
+      if (typeText == null) return
 
-      if (text.startsWith(SCALA_COLLECTION_IMMUTABLE_BASE) || SCALA_PREDEF_IMMUTABLE_BASES.contains(text)) {
+      if (typeText.startsWith(SCALA_COLLECTION_IMMUTABLE_BASE) || SCALA_PREDEF_IMMUTABLE_BASES.contains(typeText)) {
         simpleAnnotate(ScalaBundle.message("scala.immutable.collection"), DefaultHighlighter.IMMUTABLE_COLLECTION)
-      } else if (text.startsWith(SCALA_COLLECTION_MUTABLE_BASE)) {
+      }
+      else if (typeText.startsWith(SCALA_COLLECTION_MUTABLE_BASE)) {
         simpleAnnotate(ScalaBundle.message("scala.mutable.collection"), DefaultHighlighter.MUTABLE_COLLECTION)
-      } else if (conformsByNames(resolvedType, JAVA_COLLECTIONS_BASES)) {
+      }
+      else if (conformsByNames(resolvedType, JAVA_COLLECTIONS_BASES)) {
         simpleAnnotate(ScalaBundle.message("java.collection"), DefaultHighlighter.JAVA_COLLECTION)
-      } else if (resolvedType.canonicalText.startsWith(SCALA_COLLECTION_GENERIC_BASE) && refElement.isInstanceOf[ScReferenceExpression]) {
-        refElement.asInstanceOf[ScReferenceExpression].`type`().foreach {
-          case FunctionType(returnType, _) => Option(returnType).foreach(a =>
-            if (a.canonicalText.startsWith(SCALA_COLLECTION_MUTABLE_BASE)) {
-              simpleAnnotate(ScalaBundle.message("scala.mutable.collection"), DefaultHighlighter.MUTABLE_COLLECTION)
-            } else if (a.canonicalText.startsWith(SCALA_COLLECTION_IMMUTABLE_BASE)) {
-              simpleAnnotate(ScalaBundle.message("scala.immutable.collection"), DefaultHighlighter.IMMUTABLE_COLLECTION)
-            })
-          case _ =>
-        }
       }
     }
 
-    def annotateCollection(resolvedClazz: PsiClass): Unit = {
-      annotateCollectionByType(ScalaType.designator(resolvedClazz))
-    }
-
-    val resolvedElement = refElement.resolve()
-
     resolvedElement match {
-      case c: PsiClass if refElement.parentOfType(classOf[ScImportExpr]).isEmpty =>
-        annotateCollection(c)
-      case x: ScTypeAlias =>
-        x.getOriginalElement match {
+      case c: PsiClass =>
+        val isInImport = refElement.parentOfType(classOf[ScImportExpr]).nonEmpty
+        if (isInImport) {
+          //skip, do not annotate collection references inside import
+        } else {
+          annotateCollectionByType(ScalaType.designator(c))
+        }
+      case alias: ScTypeAlias =>
+        alias.getOriginalElement match {
           case originalElement: ScTypeAliasDefinition =>
             originalElement.aliasedType.foreach(annotateCollectionByType)
           case _ =>
         }
       case x: ScBindingPattern =>
         x.nameContext match {
-          case _: ScValue | _: ScVariable =>
-            Option(x.containingClass).foreach(a => if (SCALA_PREDEFINED_OBJECTS.contains(a.qualifiedName)) {
-              x.`type`().foreach(annotateCollectionByType)
-            })
-          case _: ScCaseClause =>
-            DefaultHighlighter.PATTERN
-          case _: ScGenerator | _: ScForBinding =>
-            DefaultHighlighter.GENERATOR
+          case _: ScValueOrVariable =>
+            //when we use `Map()`, `List` actually is referenced to `immutable.Map` in `scala.Predef`, so we need to dereference it
+            //NOTE: it's automatically done during resolve if
+            //org.jetbrains.plugins.scala.settings.ScalaProjectSettings.getAliasSemantics ise set to EXPORT (by default)
+            Option(x.containingClass).foreach { c =>
+              if (SCALA_PREDEFINED_OBJECTS.contains(c.qualifiedName)) {
+                x.`type`().foreach(annotateCollectionByType)
+              }
+            }
           case _ =>
-        }
-      case x@(_: ScFunctionDefinition | _: ScFunctionDeclaration | _: ScMacroDefinition) =>
-        if (SCALA_FACTORY_METHODS_NAMES.contains(x.asInstanceOf[PsiMethod].getName) || x.asInstanceOf[PsiMethod].isConstructor) {
-          x.parentOfType(classOf[PsiClass]).foreach(annotateCollection)
-        }
-      case x: PsiMethod =>
-        if (x.isConstructor) {
-          x.parentOfType(classOf[PsiClass]).foreach(annotateCollection)
         }
       case _ =>
     }
@@ -282,7 +275,8 @@ object ScalaColorSchemeAnnotator {
             .textAttributes(DefaultHighlighter.KEYWORD)
             .create()
           createInfoAnnotation(element, DefaultHighlighter.KEYWORD)
-        } else if (elementType == ScalaTokenTypes.tIDENTIFIER) {
+        }
+        else if (elementType == ScalaTokenTypes.tIDENTIFIER) {
           getParentByStub(element) match {
             case _: ScNameValuePair =>
               createInfoAnnotation(element, DefaultHighlighter.ANNOTATION_ATTRIBUTE)
@@ -385,7 +379,11 @@ object ScalaColorSchemeAnnotator {
     }
   }
 
-  private def createInfoAnnotation(psiElement: PsiElement, attributes: TextAttributesKey, message: String = null)(implicit holder: ScalaAnnotationHolder): Unit = {
+  private def createInfoAnnotation(
+    psiElement: PsiElement,
+    attributes: TextAttributesKey,
+    @InspectionMessage message: String = null
+  )(implicit holder: ScalaAnnotationHolder): Unit = {
     val builder =
       if (message == null) holder.newSilentAnnotation(HighlightSeverity.INFORMATION)
       else holder.newAnnotation(HighlightSeverity.INFORMATION, message)

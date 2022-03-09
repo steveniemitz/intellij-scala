@@ -1,16 +1,15 @@
 package org.jetbrains.plugins.scala.testingSupport.test.scalatest
 
-import org.jetbrains.plugins.scala.base.{ScalaLightPlatformCodeInsightTestCaseAdapter, TestScalaProjectSettings}
+import org.jetbrains.plugins.scala.base.ScalaLightCodeInsightFixtureTestAdapter
+import org.jetbrains.plugins.scala.settings.ScalaProjectSettings
 import org.junit.Assert
 
-import scala.annotation.nowarn
+class ScalaTestTestFrameworkTest extends ScalaLightCodeInsightFixtureTestAdapter {
 
-@nowarn("msg=ScalaLightPlatformCodeInsightTestCaseAdapter")
-class ScalaTestTestFrameworkTest extends ScalaLightPlatformCodeInsightTestCaseAdapter with TestScalaProjectSettings {
-
-  val scalaTestFramework = new ScalaTestTestFramework
+  private val scalaTestFramework = new ScalaTestTestFramework
 
   def testDefaultSuperClass(): Unit = {
+    val scalaProjectSettings = ScalaProjectSettings.getInstance(getProject)
 
     scalaProjectSettings.setScalaTestDefaultSuperClass("org.scalatest.FlatSpec")
     Assert.assertEquals("org.scalatest.FlatSpec", scalaTestFramework.getDefaultSuperClass)
@@ -18,5 +17,4 @@ class ScalaTestTestFrameworkTest extends ScalaLightPlatformCodeInsightTestCaseAd
     scalaProjectSettings.setScalaTestDefaultSuperClass("org.scalatest.WordSPec")
     Assert.assertEquals("org.scalatest.WordSPec", scalaTestFramework.getDefaultSuperClass)
   }
-
 }
