@@ -2,8 +2,8 @@ package org.jetbrains.plugins.scala.lang.actions.editor.enter
 
 import junit.framework.Test
 import org.jetbrains.plugins.scala.base.EditorActionTestBase
-import org.jetbrains.plugins.scala.compilation.CompilerTestUtil.withModifiedSetting2
 import org.jetbrains.plugins.scala.lang.formatting.settings.ScalaCodeStyleSettings
+import org.jetbrains.plugins.scala.util.RevertableChange.withModifiedSetting2
 
 trait Scala2AndScala3EnterActionCommonTests extends Test {
   self: EditorActionTestBase =>

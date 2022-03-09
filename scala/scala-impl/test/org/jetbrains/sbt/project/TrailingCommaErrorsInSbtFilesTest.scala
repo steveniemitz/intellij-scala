@@ -4,12 +4,12 @@ import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.ProjectUtil
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.psi.{PsiErrorElement, PsiFile, PsiManager}
-import org.jetbrains.plugins.scala.compilation.CompilerTestUtil.RevertableChange
 import org.jetbrains.plugins.scala.editor.DocumentExt
 import org.jetbrains.plugins.scala.extensions.{PsiElementExt, executeUndoTransparentAction, invokeAndWait}
 import org.jetbrains.plugins.scala.project.ProjectPsiFileExt
 import org.jetbrains.plugins.scala.settings.ScalaProjectSettings
 import org.jetbrains.plugins.scala.settings.ScalaProjectSettings.TrailingCommasMode
+import org.jetbrains.plugins.scala.util.RevertableChange
 import org.jetbrains.plugins.scala.{SlowTests, inWriteAction}
 import org.jetbrains.sbt.project.ProjectStructureMatcher.AttributeMatchType
 import org.jetbrains.sbt.project.TrailingCommaErrorsInSbtFilesTest.{ParserError, withModifiedValue}

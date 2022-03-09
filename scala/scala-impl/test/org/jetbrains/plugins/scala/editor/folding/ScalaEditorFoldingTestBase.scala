@@ -4,7 +4,7 @@ import com.intellij.codeInsight.folding.CodeFoldingSettings
 import com.intellij.openapi.util.TextRange
 import com.intellij.util.xmlb.XmlSerializerUtil
 import org.jetbrains.plugins.scala.base.{ScalaLightCodeInsightFixtureTestAdapter, SharedTestProjectToken}
-import org.jetbrains.plugins.scala.compilation.CompilerTestUtil.RevertableChange
+import org.jetbrains.plugins.scala.util.RevertableChange
 import org.jetbrains.plugins.scala.editor.folding.ScalaEditorFoldingTestBase.FoldingInfo
 import org.jetbrains.plugins.scala.extensions.StringExt
 import org.jetbrains.plugins.scala.lang.folding.ScalaFoldingBuilder

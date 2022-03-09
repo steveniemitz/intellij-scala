@@ -4,8 +4,8 @@ package completion
 
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.testFramework.{EditorTestUtil, UsefulTestCase}
-import org.jetbrains.plugins.scala.compilation.CompilerTestUtil
 import org.jetbrains.plugins.scala.lang.completion
+import org.jetbrains.plugins.scala.util.RevertableChange.withModifiedRegistryValue
 
 import scala.jdk.CollectionConverters._
 
@@ -24,7 +24,7 @@ abstract class SbtCompletionTestBase extends completion.CompletionTestBase {
     // 1. Make the prefix used for completion longer, so that there are less suggestions.
     // 2. Increase 'ide.completion.variant.limit' (using RegistryValue#setValue with a test root disposable).
     // 3. Ignore this warning.
-    CompilerTestUtil.withModifiedRegistryValue("ide.completion.variant.limit", 1500).run {
+    withModifiedRegistryValue("ide.completion.variant.limit", 1500).run {
       super.doTest()
     }
   }

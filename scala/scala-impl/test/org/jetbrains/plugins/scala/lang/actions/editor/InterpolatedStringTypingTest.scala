@@ -1,10 +1,9 @@
-package org.jetbrains.plugins.scala
-package lang.actions.editor
+package org.jetbrains.plugins.scala.lang.actions.editor
 
 import com.intellij.codeInsight.CodeInsightSettings
 import com.intellij.testFramework.fixtures.CodeInsightTestFixture
 import org.jetbrains.plugins.scala.base.EditorActionTestBase
-import org.jetbrains.plugins.scala.compilation.CompilerTestUtil.RevertableChange
+import org.jetbrains.plugins.scala.util.RevertableChange
 
 /**
  * User: Dmitry Naydanov

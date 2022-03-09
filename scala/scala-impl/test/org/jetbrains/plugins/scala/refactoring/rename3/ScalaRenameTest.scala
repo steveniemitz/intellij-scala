@@ -1,7 +1,9 @@
-package org.jetbrains .plugins.scala
-package refactoring.rename3
+package org.jetbrains .plugins.scala.refactoring.rename3
 
-import org.jetbrains.plugins.scala.compilation.CompilerTestUtil.{NoOpRevertableChange, RevertableChange, withErrorsFromCompilerDisabled}
+import org.jetbrains.plugins.scala.compilation.CompilerTestUtil.withErrorsFromCompilerDisabled
+import org.jetbrains.plugins.scala.util.RevertableChange
+import org.jetbrains.plugins.scala.util.RevertableChange.NoOpRevertableChange
+import org.jetbrains.plugins.scala.{LatestScalaVersions, ScalaVersion}
 
 /**
  * Nikolay.Tropin

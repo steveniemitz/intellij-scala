@@ -2,7 +2,7 @@ package org.jetbrains.plugins.scala.annotator
 
 import com.intellij.psi.PsiElement
 import org.jetbrains.plugins.scala.ScalaBundle
-import org.jetbrains.plugins.scala.compilation.CompilerTestUtil.withModifiedSetting2
+import org.jetbrains.plugins.scala.util.RevertableChange.withModifiedSetting2
 import org.jetbrains.plugins.scala.lang.psi.api.base.ScReference
 import org.jetbrains.plugins.scala.settings.ScalaProjectSettings
 import org.jetbrains.plugins.scala.settings.ScalaProjectSettings.{AliasExportSemantics, ScalaCollectionHighlightingLevel}

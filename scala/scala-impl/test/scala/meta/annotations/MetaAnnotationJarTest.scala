@@ -4,15 +4,13 @@ package annotations
 import com.intellij.lang.annotation.HighlightSeverity
 import com.intellij.openapi.editor.markup.GutterIconRenderer
 import com.intellij.openapi.projectRoots.ProjectJdkTable
-import com.intellij.openapi.util.registry.Registry
 import com.intellij.testFramework.fixtures.JavaCodeInsightFixtureTestCase
 import com.intellij.testFramework.{PsiTestUtil, TestActionEvent}
 import org.jetbrains.plugins.scala.base.libraryLoaders.{LibraryLoader, ScalaSDKLoader}
-import org.jetbrains.plugins.scala.compilation.CompilerTestUtil
-import org.jetbrains.plugins.scala.compilation.CompilerTestUtil.withModifiedRegistryValue
 import org.jetbrains.plugins.scala.extensions.inWriteAction
 import org.jetbrains.plugins.scala.lang.psi.api.toplevel.typedef.ScClass
-import org.jetbrains.plugins.scala.util.TestUtils
+import org.jetbrains.plugins.scala.util.RevertableChange.withModifiedRegistryValue
+import org.jetbrains.plugins.scala.util.{RevertableChange, TestUtils}
 import org.jetbrains.plugins.scala.{LatestScalaVersions, ScalaBundle, ScalaVersion}
 import org.junit.Assert._
 import org.junit.Ignore
@@ -49,8 +47,8 @@ abstract class MetaAnnotationJarTest extends JavaCodeInsightFixtureTestCase with
 
   protected lazy val testJarPath = s"/addFoo_${version.major}_$PARADISE_VERSION.jar"
 
-  private val revertible: CompilerTestUtil.RevertableChange =
-    withModifiedRegistryValue("scala.meta.annotation.expansion.legacy.support", true)
+  private val revertible: RevertableChange =
+    withModifiedRegistryValue("scala.meta.annotation.expansion.legacy.support", newValue = true)
 
   override def setUp(): Unit = {
     super.setUp()
