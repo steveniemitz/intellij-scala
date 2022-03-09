@@ -1,17 +1,17 @@
-package org.jetbrains.plugins.scala
-package codeInspection
-package internal
+package org.jetbrains.plugins.scala.codeInspection.internal
 
 import com.intellij.codeInsight.daemon.impl.HighlightVisitor
 import com.intellij.codeInsight.daemon.impl.analysis.{HighlightInfoHolder, HighlightVisitorImpl}
 import com.intellij.codeInspection._
 import com.intellij.lang.annotation._
 import com.intellij.lang.injection.InjectedLanguageManager
+import com.intellij.openapi.editor.colors.TextAttributesKey
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.{PsiElement, PsiElementVisitor, PsiJavaFile}
 import org.jetbrains.annotations.Nls
 import org.jetbrains.plugins.scala.annotator.{DummyScalaAnnotationBuilder, ScalaAnnotationBuilder, ScalaAnnotationHolder, ScalaAnnotator}
+import org.jetbrains.plugins.scala.codeInspection.ScalaInspectionBundle
 import org.jetbrains.plugins.scala.extensions.PsiElementExt
 import org.jetbrains.plugins.scala.lang.psi.api.ScalaFile
 
@@ -94,12 +94,10 @@ object AnnotatorBasedErrorInspection {
     private class MyAnnotationBuilder(severity: HighlightSeverity, message: String = null)
       extends DummyScalaAnnotationBuilder(severity, message) {
 
-      override def onCreate(severity: HighlightSeverity, @Nls message: String, range: TextRange): Unit = {
+      override def onCreate(severity: HighlightSeverity, @Nls message: String, range: TextRange, enforcedAttributes: TextAttributesKey): Unit = {
         val rangeInElement = range.shiftLeft(element.startOffset)
         holder.registerProblem(element, rangeInElement, message)
       }
-
     }
-
   }
 }

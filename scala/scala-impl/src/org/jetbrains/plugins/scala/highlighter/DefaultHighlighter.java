@@ -27,6 +27,10 @@ import org.jetbrains.annotations.NotNull;
 
 import java.awt.*;
 
+/**
+ * NOTE: some non default values are specified in predefined color schemes<br>
+ * See scala/scala-impl/resources/colorSchemes/*.xml (e.g. ScalaDarcula.xml or ScalaDefault.xml)
+ */
 public class DefaultHighlighter {
 
   // TODO: can we inline all these ids?

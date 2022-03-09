@@ -1,35 +1,16 @@
 package org.jetbrains.plugins.scala.annotator
 
-import org.jetbrains.plugins.scala.base.{ScalaLightCodeInsightFixtureTestAdapter, SharedTestProjectToken}
+import com.intellij.psi.PsiElement
+import org.jetbrains.plugins.scala.ScalaBundle
 import org.jetbrains.plugins.scala.compilation.CompilerTestUtil.withModifiedSetting2
-import org.jetbrains.plugins.scala.extensions.{PsiElementExt, StringExt}
-import org.jetbrains.plugins.scala.highlighter.ScalaColorSchemeAnnotator
-import org.jetbrains.plugins.scala.lang.psi.api.ScalaFile
 import org.jetbrains.plugins.scala.lang.psi.api.base.ScReference
 import org.jetbrains.plugins.scala.settings.ScalaProjectSettings
 import org.jetbrains.plugins.scala.settings.ScalaProjectSettings.{AliasExportSemantics, ScalaCollectionHighlightingLevel}
-import org.jetbrains.plugins.scala.{ScalaBundle, ScalaVersion, base}
 import org.junit.Assert.assertEquals
 
 import scala.collection.immutable.ListSet
 
-class CollectionByTypeAnnotatorTest_Scala_2_10 extends CollectionByTypeAnnotatorTestCommonTests {
-  override protected def supportedIn(version: ScalaVersion): Boolean = version == ScalaVersion.Latest.Scala_2_10
-}
-class CollectionByTypeAnnotatorTest_Scala_2_11 extends CollectionByTypeAnnotatorTestCommonTests {
-  override protected def supportedIn(version: ScalaVersion): Boolean = version == ScalaVersion.Latest.Scala_2_11
-}
-class CollectionByTypeAnnotatorTest_Scala_2_12 extends CollectionByTypeAnnotatorTestCommonTests {
-  override protected def supportedIn(version: ScalaVersion): Boolean = version == ScalaVersion.Latest.Scala_2_12
-}
-class CollectionByTypeAnnotatorTest_Scala_2_13 extends CollectionByTypeAnnotatorTestCommonTests {
-  override protected def supportedIn(version: ScalaVersion): Boolean = version == ScalaVersion.Latest.Scala_2_13
-}
-class CollectionByTypeAnnotatorTest_Scala_3 extends CollectionByTypeAnnotatorTestCommonTests {
-  override protected def supportedIn(version: ScalaVersion): Boolean = version == ScalaVersion.Latest.Scala_3
-}
-
-abstract class CollectionByTypeAnnotatorTestCommonTests extends CollectionByTypeAnnotatorTestBase {
+class ScalaColorSchemeAnnotatorCollectionByTypeTest extends ScalaColorSchemeAnnotatorCollectionByTypeTestBase {
 
   def testAnnotateImmutable_NonQualified(): Unit = {
     val text =
@@ -180,7 +161,7 @@ abstract class CollectionByTypeAnnotatorTestCommonTests extends CollectionByType
 
   def testAnnotateImmutable_FromPredef_DefinitionAliasSemantics(): Unit = {
     withAliasSemantics(AliasExportSemantics.Definition) {
-    val text =
+      val text =
         """class A {
           |  val _ = List(1, 2, 3)
           |  val _ = List[Int](1, 2, 3)
@@ -504,7 +485,7 @@ abstract class CollectionByTypeAnnotatorTestCommonTests extends CollectionByType
   }
 }
 
-abstract class CollectionByTypeAnnotatorTestBase extends ScalaLightCodeInsightFixtureTestAdapter {
+abstract class ScalaColorSchemeAnnotatorCollectionByTypeTestBase extends ScalaColorSchemeAnnotatorTestBase[String] {
   protected val immutableCollectionMessage = ScalaBundle.message("scala.immutable.collection")
   protected val mutableCollectionMessage = ScalaBundle.message("scala.mutable.collection")
   protected val javaCollectionMessage = ScalaBundle.message("java.collection")
@@ -526,65 +507,25 @@ abstract class CollectionByTypeAnnotatorTestBase extends ScalaLightCodeInsightFi
     super.tearDown()
   }
 
-  override protected def sharedProjectToken: SharedTestProjectToken =
-    base.SharedTestProjectToken(this.getClass)
-
-  override protected def normalizeFileText(fileText: String): String = fileText
-
-  protected def annotateWithColorSchemeAnnotator(text: String): AnnotatorHolderWithRangeMock = {
-    configureFromFileText("dummy.scala", text.withNormalizedSeparator)
-
-    val scalaFile = getFile.asInstanceOf[ScalaFile]
-
-    val holder = new AnnotatorHolderWithRangeMock(scalaFile)
-
-    scalaFile.breadthFirst().foreach {
-      case refElement: ScReference =>
-        ScalaColorSchemeAnnotator.highlightElement(refElement)(holder)
-      case _ =>
-    }
-
-    holder
+  override protected def needToAnnotateElement(element: PsiElement): Boolean = {
+    //collection-by-type annotations is only run for references, so optimise it
+    element.isInstanceOf[ScReference]
   }
 
-  protected def testHasNoAnnotations(
-    text: String,
-    filterAnnotationMessages: String*
-  ): Unit = {
-    testAnnotations(text, filterAnnotationMessages.to(ListSet), "")
+  override protected def buildAnnotationsTestText(annotations: Seq[Message2]): String = {
+    annotations.map(_.textWithoutRangeAndCode).mkString("\n")
   }
+
+  override protected def getFilterByField(annotation: Message2): String =
+    annotation.message
+
+  protected case class MessageWithCode(message: String, fileText: String)
 
   protected def testHasNoAnnotations(
     text: String,
     filterAnnotatedMessagesWithFileText: MessageWithCode*
   )(implicit d: DummyImplicit): Unit = {
     testAnnotations(text, filterAnnotatedMessagesWithFileText.to(ListSet), "")
-  }
-
-  protected case class MessageWithCode(message: String, fileText: String)
-
-  protected def testAnnotations(
-    text: String,
-    filterAnnotationMessages: String,
-    expectedAnnotationsText: String
-  ): Unit = {
-    testAnnotations(text, Set(filterAnnotationMessages), expectedAnnotationsText)
-  }
-
-  protected def testAnnotations(
-    text: String,
-    filterAnnotationMessages: Set[String],
-    expectedAnnotationsText: String
-  ): Unit = {
-    val holder = annotateWithColorSchemeAnnotator(text)
-    val annotationsWithMatchingMessage = holder.annotations.filter(a => filterAnnotationMessages.contains(a.message))
-    val actualAnnotationsText = annotationsWithMatchingMessage.map(_.textWithoutCode).mkString("\n")
-
-    assertEquals(
-      s"Wrong annotations set for filtered message ${filterAnnotationMessages.map(m => s"`$m`").mkString(", ")}",
-      expectedAnnotationsText.replaceAll("\n+", "\n").trim,
-      actualAnnotationsText.trim
-    )
   }
 
   protected def testAnnotations(
@@ -596,7 +537,8 @@ abstract class CollectionByTypeAnnotatorTestBase extends ScalaLightCodeInsightFi
     val annotationsWithMatchingMessage = holder.annotations.filter(a => {
       filterAnnotationMessagesWithFileText.contains(MessageWithCode(a.message, a.fileText))
     })
-    val actualAnnotationsText = annotationsWithMatchingMessage.map(_.textWithoutCode).mkString("\n")
+    val actualAnnotationsText = buildAnnotationsTestText(annotationsWithMatchingMessage)
+
     assertEquals(
       s"Wrong annotations set for filtered message+fileText ${filterAnnotationMessagesWithFileText.map(m => s"`$m`").mkString(", ")}",
       expectedAnnotationsText.trim,

@@ -3,6 +3,8 @@ package projectHighlighting
 
 import com.intellij.ide.highlighter.JavaFileType
 import com.intellij.lang.annotation.HighlightSeverity
+import com.intellij.openapi.editor.colors.TextAttributesKey
+import com.intellij.openapi.editor.markup.TextAttributes
 import com.intellij.openapi.fileTypes.FileType
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.{Key, TextRange}
@@ -115,11 +117,11 @@ object AllProjectHighlightingTest {
 
     val fileName = relPath.getOrElse(relativePathOf(scalaFile))
     val mock = new AnnotatorHolderMock(scalaFile) {
-      override def createMockAnnotation(severity: HighlightSeverity, range: TextRange, message: String): Option[Message] = {
+      override def createMockAnnotation(severity: HighlightSeverity, range: TextRange, message: String, enforcedAttributes: TextAttributesKey): Option[Message] = {
         if (severity == HighlightSeverity.ERROR) {
           reporter.reportError(fileName, range, message + randomSeedDebugSuffix)
         }
-        super.createMockAnnotation(severity, range, message)
+        super.createMockAnnotation(severity, range, message, enforcedAttributes)
       }
     }
 

@@ -44,10 +44,17 @@ object ScalaColorSchemeAnnotator {
   private val SCALA_FACTORY_METHODS_NAMES = Set("make", "apply")
   private val SCALA_COLLECTION_MUTABLE_BASE = "_root_.scala.collection.mutable."
   private val SCALA_COLLECTION_IMMUTABLE_BASE = "_root_.scala.collection.immutable."
-  private val SCALA_COLLECTION_GENERIC_BASE = "_root_.scala.collection.generic."
+
   private val SCALA_PREDEFINED_OBJECTS = Set("scala", "scala.Predef")
-  private val SCALA_PREDEF_IMMUTABLE_BASES = Set("_root_.scala.PredefMap", "_root_.scala.PredefSet", "scalaList",
-    "scalaNil", "scalaStream", "scalaVector", "scalaSeq")
+  private val SCALA_PREDEF_IMMUTABLE_BASES = Set(
+    "_root_.scala.PredefMap",
+    "_root_.scala.PredefSet",
+    "scalaList",
+    "scalaNil",
+    "scalaStream",
+    "scalaVector",
+    "scalaSeq"
+  )
 
   private def getParentByStub(x: PsiElement): PsiElement = {
     x match {
@@ -262,9 +269,6 @@ object ScalaColorSchemeAnnotator {
       case r: ScReference => highlightReferenceElement(r)
       case x: ScAnnotation => visitAnnotation(x)
       case x: ScParameter => visitParameter(x)
-      case x: ScCaseClause => visitCaseClause(x)
-      case x: ScGenerator => visitGenerator(x)
-      case x: ScForBinding => visitForBinding(x)
       case x: ScTypeAlias => visitTypeAlias(x)
       case _ =>
         import ScalaTokenTypes.SOFT_KEYWORDS
@@ -317,7 +321,7 @@ object ScalaColorSchemeAnnotator {
                   }
                 case _: ScCaseClause =>
                   createInfoAnnotation(element, DefaultHighlighter.PATTERN)
-                case _: ScGenerator | _: ScForBinding =>
+                case _: ScGenerator | _: ScForBinding=>
                   createInfoAnnotation(element, DefaultHighlighter.GENERATOR)
                 case _ =>
               }
@@ -350,27 +354,6 @@ object ScalaColorSchemeAnnotator {
       else DefaultHighlighter.PARAMETER
     createInfoAnnotation(nameId, attributesKey)
 
-  }
-
-  private def visitPattern(pattern: ScPattern, attribute: TextAttributesKey)(implicit holder: ScalaAnnotationHolder): Unit = {
-    for (binding <- pattern.bindings if !binding.isWildcard) {
-      createInfoAnnotation(binding.nameId, attribute)
-    }
-  }
-
-  private def visitCaseClause(clause: ScCaseClause)(implicit holder: ScalaAnnotationHolder): Unit = {
-    clause.pattern match {
-      case Some(x) => visitPattern(x, DefaultHighlighter.PATTERN)
-      case None =>
-    }
-  }
-
-  private def visitGenerator(generator: ScGenerator)(implicit holder: ScalaAnnotationHolder): Unit = {
-    visitPattern(generator.pattern, DefaultHighlighter.GENERATOR)
-  }
-
-  private def visitForBinding(forBinding: ScForBinding)(implicit holder: ScalaAnnotationHolder): Unit = {
-    visitPattern(forBinding.pattern, DefaultHighlighter.GENERATOR)
   }
 
   private def referenceIsToCompanionObjectOfClass(r: ScReference): Boolean = {

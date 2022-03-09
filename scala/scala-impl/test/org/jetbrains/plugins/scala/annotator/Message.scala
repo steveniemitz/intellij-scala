@@ -1,5 +1,6 @@
 package org.jetbrains.plugins.scala.annotator
 
+import com.intellij.openapi.editor.colors.TextAttributesKey
 import com.intellij.openapi.util.TextRange
 
 import scala.math.Ordered.orderingToOrdered
@@ -24,14 +25,15 @@ case class Hint(override val element: String, text: String, override val message
 
 //////////////////////////////////
 //
-// Same but with range
+// Practically the ame but with range and text attributes
+// NOTE: ideally we should consider unifying all tests to use single version of test message
 //
 //////////////////////////////////
 
-object MessageWithRange {
-  case class Info(override val range: TextRange, override val fileText: String, override val message: String) extends MessageWithRange
-  case class Warning(override val range: TextRange, override val fileText: String, override val message: String) extends MessageWithRange
-  case class Error(override val range: TextRange, override val fileText: String, override val message: String) extends MessageWithRange
+object Message2 {
+  case class Info(override val range: TextRange, override val fileText: String, override val message: String, override val textAttributesKey: TextAttributesKey) extends Message2
+  case class Warning(override val range: TextRange, override val fileText: String, override val message: String, override val textAttributesKey: TextAttributesKey) extends Message2
+  case class Error(override val range: TextRange, override val fileText: String, override val message: String, override val textAttributesKey: TextAttributesKey) extends Message2
 
 
   implicit object TextRangeOrdering extends scala.math.Ordering[TextRange] {
@@ -40,7 +42,7 @@ object MessageWithRange {
   }
 }
 
-sealed abstract class MessageWithRange extends Ordered[MessageWithRange] {
+sealed abstract class Message2 extends Ordered[Message2] {
   def range: TextRange
   /**
    * contains annotated code, corresponding to [[range]]
@@ -50,15 +52,19 @@ sealed abstract class MessageWithRange extends Ordered[MessageWithRange] {
    */
   def fileText: String
   def message: String
+  def textAttributesKey: TextAttributesKey
 
-  override def compare(that: MessageWithRange): Int = {
-    import org.jetbrains.plugins.scala.annotator.MessageWithRange.TextRangeOrdering
+  override def compare(that: Message2): Int = {
+    import org.jetbrains.plugins.scala.annotator.Message2.TextRangeOrdering
 
     import scala.math.Ordered.orderingToOrdered
 
     (this.range, this.message) compare (that.range, that.message)
   }
 
-  def textWithoutCode: String =
+  def textWithoutRangeAndCode: String =
     this.getClass.getSimpleName + s"($range,$message)"
+
+  def textWithoutRangeAndAttributeKey: String =
+    this.getClass.getSimpleName + s"($range,${textAttributesKey.getExternalName})"
 }
