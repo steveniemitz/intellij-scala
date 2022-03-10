@@ -1,15 +1,12 @@
 package org.jetbrains.plugins.scala.base
 
-import com.intellij.openapi.actionSystem.DataContext
-import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.editor.Document
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.projectRoots.{ProjectJdkTable, Sdk}
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.util.text.StringUtil
-import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.psi.{PsiFile, PsiManager}
-import com.intellij.testFramework.{LightPlatformCodeInsightTestCase, LightPlatformTestCase, LightProjectDescriptor}
+import com.intellij.testFramework.{LightPlatformCodeInsightTestCase, LightProjectDescriptor}
 import org.jetbrains.plugins.scala.base.libraryLoaders._
 import org.jetbrains.plugins.scala.extensions.inWriteAction
 import org.jetbrains.plugins.scala.util.TestUtils
@@ -20,13 +17,10 @@ import org.jetbrains.plugins.scala.util.TestUtils
  */
 @deprecated
 abstract class ScalaLightPlatformCodeInsightTestCaseAdapter extends LightPlatformCodeInsightTestCase with ScalaSdkOwner {
-  import LightPlatformTestCase._
 
   protected def sourceRootPath: String = null
 
   final protected def baseRootPath: String = TestUtils.getTestDataPath + "/"
-
-  protected def getSourceRootAdapter: VirtualFile = getSourceRoot
 
   override protected def getProjectJDK: Sdk = SmartJDKLoader.getOrCreateJDK()
 
@@ -63,28 +57,21 @@ abstract class ScalaLightPlatformCodeInsightTestCaseAdapter extends LightPlatfor
 
   protected def additionalLibraries: Seq[LibraryLoader] = Vector.empty
 
-  protected def getVFileAdapter: VirtualFile = getVFile
+  ////////////////////////////////////////////////////////
+  //Some protected methods inherited from Java require overriding + delegating if we want to use them in traits
+  //This is required to avoid compilation errors due to some implementation restrictions.
+  //For details see https://stackoverflow.com/questions/17557057/how-to-solve-implementation-restriction-trait-accesses-protected-method
+  ////////////////////////////////////////////////////////
+  override protected def getProject: Project = super.getProject
 
-  protected def getEditorAdapter: Editor = getEditor
-
-  protected def getProjectAdapter: Project = getProject
-
-  protected def getModuleAdapter: Module = getModule
-
-  protected def getFileAdapter: PsiFile = getFile
-
-  protected def getPsiManagerAdapter: PsiManager = getPsiManager
-
-  protected def getCurrentEditorDataContextAdapter: DataContext = getCurrentEditorDataContext
-
-  protected def executeActionAdapter(actionId: String): Unit = executeAction(actionId)
-
-  protected def configureFromFileTextAdapter(fileName: String, fileText: String): Unit =
-    configureFromFileText(fileName, StringUtil.convertLineSeparators(fileText))
+  override protected def configureFromFileText(fileName: String, fileText: String): Document =
+    super.configureFromFileText(fileName, StringUtil.convertLineSeparators(fileText))
 
   @throws(classOf[Exception])
   override protected def tearDown(): Unit = try {
     disposeLibraries(getModule)
     inWriteAction(ProjectJdkTable.getInstance().removeJdk(getProjectJDK))
-  } finally super.tearDown()
+  } finally {
+    super.tearDown()
+  }
 }

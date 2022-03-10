@@ -37,7 +37,7 @@ abstract class CompletionTestBase extends base.ScalaLightPlatformCodeInsightTest
   protected final def getExpectedResult: String = {
     import lang.lexer.ScalaTokenTypes._
 
-    val scalaFile = getFileAdapter.asInstanceOf[ScalaFile]
+    val scalaFile = getFile.asInstanceOf[ScalaFile]
     val lastPsi = scalaFile.findElementAt(scalaFile.getText.length - 1)
 
     val trimRight = lastPsi.getNode.getElementType match {
@@ -72,16 +72,16 @@ abstract class CompletionTestBase extends base.ScalaLightPlatformCodeInsightTest
       )
     )
 
-    configureFromFileTextAdapter(fileName, fileText)
+    configureFromFileText(fileName, fileText)
 
     val offset = fileText.indexOf(caretMarker) match {
       case -1 => throw new AssertionError(s"Not specified end marker in test case. Use $caretMarker in scala file for this.")
       case index => index
     }
 
-    val project = getProjectAdapter
+    val project = getProject
     val editor = FileEditorManager.getInstance(project)
-      .openTextEditor(new OpenFileDescriptor(project, getVFileAdapter, offset), false)
+      .openTextEditor(new OpenFileDescriptor(project, getVFile, offset), false)
 
     val completionType = if (fileName.startsWith("Smart")) CompletionType.SMART else CompletionType.BASIC
     new CodeCompletionHandlerBase(

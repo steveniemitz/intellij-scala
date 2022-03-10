@@ -38,7 +38,7 @@ abstract public class ScaladocLinkResolveBase extends ScalaResolveTestCase {
       fileText.replace(i, i + testRef.length(), "");
     }
 
-    configureFromFileTextAdapter(getTestName(false) + ".scala", fileText.toString());
+    configureFromFileText(getTestName(false) + ".scala", fileText.toString());
     return list;
   }
 
@@ -46,7 +46,7 @@ abstract public class ScaladocLinkResolveBase extends ScalaResolveTestCase {
     List<Integer> carets = getAllRef();
 
     for (int i : carets) {
-      PsiReference ref = getFileAdapter().findReferenceAt(i);
+      PsiReference ref = getFile().findReferenceAt(i);
       ScalaResolveResult[] results = ((ScReference) ref).multiResolveScala(false);
       assertSize(expectedLength, results);
 

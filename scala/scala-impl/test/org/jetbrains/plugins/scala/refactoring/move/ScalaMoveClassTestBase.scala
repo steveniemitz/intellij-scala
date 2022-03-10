@@ -41,7 +41,7 @@ abstract class ScalaMoveClassTestBase extends ScalaLightPlatformCodeInsightTestC
     val rootBefore = root + "/before"
     val rootAfter  = root + "/after"
     findAndRefreshVFile(rootBefore)
-    rootDirBefore = PsiTestUtil.createTestProjectStructure(getProjectAdapter, getModuleAdapter, rootBefore, new util.HashSet[Path](), true)
+    rootDirBefore = PsiTestUtil.createTestProjectStructure(getProject, getModule, rootBefore, new util.HashSet[Path](), true)
     rootDirAfter = findAndRefreshVFile(rootAfter)
   }
 
@@ -57,10 +57,10 @@ abstract class ScalaMoveClassTestBase extends ScalaLightPlatformCodeInsightTestC
     try {
       performAction(classNames, newPackageName, mode)
     } finally {
-      PsiTestUtil.removeSourceRoot(getModuleAdapter, rootDirBefore)
+      PsiTestUtil.removeSourceRoot(getModule, rootDirBefore)
     }
     settings.MOVE_COMPANION = moveCompanionOld
-    PostprocessReformattingAspect.getInstance(getProjectAdapter).doPostponedFormatting()
+    PostprocessReformattingAspect.getInstance(getProject).doPostponedFormatting()
     PlatformTestUtil.assertDirectoriesEqual(rootDirAfter, rootDirBefore)
   } catch {
     case ex: Throwable =>
@@ -73,22 +73,22 @@ abstract class ScalaMoveClassTestBase extends ScalaLightPlatformCodeInsightTestC
   private def performAction(classNames: Array[String], newPackageName: String, mode: Kinds.Value): Unit = {
     val classes = new ArrayBuffer[PsiClass]()
     for (name <- classNames) {
-      classes ++= ScalaPsiManager.instance(getProjectAdapter).getCachedClasses(GlobalSearchScope.allScope(getProjectAdapter), name).filter {
+      classes ++= ScalaPsiManager.instance(getProject).getCachedClasses(GlobalSearchScope.allScope(getProject), name).filter {
         case o: ScObject if o.isSyntheticObject => false
         case c: ScClass if mode == Kinds.onlyObjects => false
         case o: ScObject if mode == Kinds.onlyClasses => false
         case _ => true
       }
     }
-    val aPackage: PsiPackage = JavaPsiFacade.getInstance(getProjectAdapter).findPackage(newPackageName)
+    val aPackage: PsiPackage = JavaPsiFacade.getInstance(getProject).findPackage(newPackageName)
     assertNotNull(s"Can't find package '$newPackageName'", aPackage)
-    val dirs: Array[PsiDirectory] = aPackage.getDirectories(GlobalSearchScope.moduleScope(getModuleAdapter))
+    val dirs: Array[PsiDirectory] = aPackage.getDirectories(GlobalSearchScope.moduleScope(getModule))
     assert(dirs.length == 1)
     ScalaFileImpl.performMoveRefactoring {
-      new MoveClassesOrPackagesProcessor(getProjectAdapter, classes.toArray,
+      new MoveClassesOrPackagesProcessor(getProject, classes.toArray,
         new SingleSourceRootMoveDestination(PackageWrapper.create(JavaDirectoryService.getInstance.getPackage(dirs(0))), dirs(0)), true, true, null).run()
     }
-    PsiDocumentManager.getInstance(getProjectAdapter).commitAllDocuments()
+    PsiDocumentManager.getInstance(getProject).commitAllDocuments()
   }
 
   object Kinds extends Enumeration {

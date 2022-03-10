@@ -12,7 +12,7 @@ class ScalaExtractMethodCaseClass extends ScalaExtractMethodTestBase {
   override def folderPath: String = super.folderPath + "caseClass/"
 
   def testNoReturnSeveralOutput(): Unit = {
-    val settings = TypeAnnotationSettings.alwaysAddType(ScalaCodeStyleSettings.getInstance(getProjectAdapter))
+    val settings = TypeAnnotationSettings.alwaysAddType(ScalaCodeStyleSettings.getInstance(getProject))
     doTest(settings = TypeAnnotationSettings.noTypeAnnotationForPublic(settings))
   }
 

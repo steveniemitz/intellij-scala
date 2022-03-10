@@ -16,13 +16,13 @@ import scala.annotation.nowarn
 abstract class BaseScalaMoveMemberTest extends ScalaLightPlatformCodeInsightTestCaseAdapter {
 
   def doTest(fromObject: String, toObject: String, memberName: String, fileText: String, expectedText: String): Unit = {
-    configureFromFileTextAdapter("dummy.scala", normalize(fileText))
+    configureFromFileText("dummy.scala", normalize(fileText))
     performAction(fromObject, toObject, memberName)
-    Assert.assertEquals(normalize(expectedText), getFileAdapter.getText)
+    Assert.assertEquals(normalize(expectedText), getFile.getText)
   }
 
   private def performAction(fromObject: String, toObject: String, memberName: String): Unit = {
-    val projectScope = ElementScope(getProjectAdapter)
+    val projectScope = ElementScope(getProject)
     val source = projectScope.getCachedObject(fromObject).orNull
     val target = projectScope.getCachedObject(toObject).orNull
 
@@ -35,6 +35,6 @@ abstract class BaseScalaMoveMemberTest extends ScalaLightPlatformCodeInsightTest
     ScalaFileImpl.performMoveRefactoring(processor.run())
 
     FileDocumentManager.getInstance.saveAllDocuments()
-    PsiDocumentManager.getInstance(getProjectAdapter).commitAllDocuments()
+    PsiDocumentManager.getInstance(getProject).commitAllDocuments()
   }
 }
