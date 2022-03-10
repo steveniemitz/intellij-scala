@@ -128,18 +128,22 @@ abstract class ScalaLightCodeInsightFixtureTestAdapter
 
     def isAroundCaret(info: HighlightInfo): Boolean = caretIndex == -1 || new TextRange(info.getStartOffset, info.getEndOffset).contains(caretIndex)
 
-    val infos: Seq[HighlightInfo] = myFixture.doHighlighting().asScala.toSeq
-
-    val warnings = infos.filter(i => StringUtil.isNotEmpty(i.getDescription) && isAroundCaret(i))
+    val actualInfos: Seq[HighlightInfo] = myFixture.doHighlighting().asScala.toSeq
+    /** filter out annotations without descriptions (supposedly just coloring),
+     * which might come e.g. from [[org.jetbrains.plugins.scala.highlighter.ScalaColorSchemeAnnotator]] */
+    val actualInfoWithDescription: Seq[HighlightInfo] = actualInfos.filter(i => StringUtil.isNotEmpty(i.getDescription))
+    val actualWarnings = actualInfoWithDescription.filter(isAroundCaret)
 
     if (shouldPass) {
-      if (warnings.isEmpty) {
+      if (actualWarnings.isEmpty) {
         val message =
-          if (infos.isEmpty) "No highlightings found"
-          else s"No matching highlightings found. All highlightings:\n${infos.map(highlightingInfoDebugString).mkString("\n")}"
+          if (actualInfoWithDescription.isEmpty)
+            "No highlightings found"
+          else
+            s"No matching highlightings found around caret. All highlightings:\n${actualInfoWithDescription.map(highlightingInfoDebugString).mkString("\n")}"
         fail(message)
       }
-    } else if (warnings.nonEmpty) {
+    } else if (actualWarnings.nonEmpty) {
       failingTestPassed()
     }
   }
