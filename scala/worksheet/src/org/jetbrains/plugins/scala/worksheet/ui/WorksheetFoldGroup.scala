@@ -8,7 +8,6 @@ import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.newvfs.FileAttribute
 import com.intellij.util.concurrency.annotations.{RequiresReadLock, RequiresWriteLock}
-import org.jetbrains.plugins.scala.macroAnnotations.Measure
 import org.jetbrains.plugins.scala.project.ProjectExt
 import org.jetbrains.plugins.scala.worksheet.ui.WorksheetDiffSplitters.{DiffMapping, SimpleWorksheetSplitter}
 import org.jetbrains.plugins.scala.worksheet.ui.WorksheetFoldGroup._
@@ -101,13 +100,6 @@ final class WorksheetFoldGroup(
     addRegion(folding)(start, end, leftEndLine, leftSideLength, spaces, expanded)
   }
 
-  @RequiresWriteLock
-  def expand(regionIdx: Int): Boolean =
-    _regions.lift(regionIdx) match {
-      case Some(region) => expand(region.region)
-      case None         => false
-    }
-
   private def expand(region: FoldRegion): Boolean =
     traverseAndChange(region, expand = true)
 
@@ -145,7 +137,6 @@ final class WorksheetFoldGroup(
     true
   }
 
-  @Measure
   @RequiresReadLock
   private def traverseRegions(target: FoldRegion): (Iterable[DiffMapping], Option[FoldRegionInfo], Int) = {
     val emptyResult: (Seq[DiffMapping], Option[FoldRegionInfo], Int) = (Seq.empty, None, 0)

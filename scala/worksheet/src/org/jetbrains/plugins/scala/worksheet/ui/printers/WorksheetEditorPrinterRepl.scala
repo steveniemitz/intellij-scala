@@ -56,18 +56,25 @@ final class WorksheetEditorPrinterRepl private[printers](
   /* we have to inject this interface because we have to restore the original error positions in worksheet editor
    * and for now this can only be done in this printer  */
   private var messagesConsumerOpt: Option[CompilerMessagesConsumer] = None
-  def updateMessagesConsumer(consumer: CompilerMessagesConsumer): Unit = messagesConsumerOpt = Some(consumer)
-
   private val psiToProcess = mutable.Queue.empty[QueuedPsi]
-  def updateEvaluatedElements(evaluatedElements: Seq[QueuedPsi]): Unit = {
-    psiToProcess.clear()
-    psiToProcess ++= evaluatedElements
-  }
 
   private val chunkOutputBuffer = new mutable.StringBuilder()
   private var chunkIsBeingProcessed = false
 
-  override val processingTerminatedPromise: Promise[Unit] = Promise.apply()
+  private var _processingTerminatedPromise: Promise[Unit] = _
+  override def processingTerminatedPromise: Promise[Unit] = _processingTerminatedPromise
+
+  def updateStateBeforeNewRun(
+    consumer: CompilerMessagesConsumer,
+    evaluatedElements: Seq[QueuedPsi]
+  ): Unit = {
+    messagesConsumerOpt = Some(consumer)
+
+    psiToProcess.clear()
+    psiToProcess ++= evaluatedElements
+
+    _processingTerminatedPromise = Promise.apply()
+  }
 
   // FIXME: now all return boolean values are not processed anywhere and do not mean anything, remove or handle
   // FIXME: handle exceptions in process line
@@ -85,7 +92,9 @@ final class WorksheetEditorPrinterRepl private[printers](
         prepareViewerDocument()
         if (lastProcessedLine.isEmpty) {
           invokeLater {
-            cleanFoldings()
+            inWriteAction {
+              cleanFoldings()
+            }
           }
         }
         chunkOutputBuffer.clear()
@@ -93,6 +102,7 @@ final class WorksheetEditorPrinterRepl private[printers](
       case ReplEnd   =>
         flushBuffer()
         updateLastLineMarker()
+        //debug("completing termination promise")
         processingTerminatedPromise.complete(Success(()))
         true
 
@@ -149,9 +159,6 @@ final class WorksheetEditorPrinterRepl private[printers](
 
   //nothing to flush, content is flushed inside chunkProcessed, not expecting any other not-flushed content
   override def flushBuffer(): Unit = {}
-
-  // Looks like we don't need any flushing here
-  override def scheduleWorksheetUpdate(): Unit = {}
 
   override def internalError(ex: Throwable): Unit = {
     val fullErrorMessage = internalErrorMessage(ex)

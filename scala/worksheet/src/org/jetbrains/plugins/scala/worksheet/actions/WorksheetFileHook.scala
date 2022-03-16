@@ -62,10 +62,9 @@ object WorksheetFileHook {
   def enableRun(file: VirtualFile, hasErrors: Boolean): Unit =
     WorksheetFileHook.getPanel(file).foreach(_.enableRun(hasErrors))
 
+  @RequiresEdt()
   def updateStoppableProcess(file: VirtualFile, exec: Option[StoppableProcess]): Unit =
-    invokeLater {
-      WorksheetFileHook.getPanel(file).foreach(_.updateStoppableProcess(exec))
-    }
+    WorksheetFileHook.getPanel(file).foreach(_.updateStoppableProcess(exec))
 
   def isRunning(file: VirtualFile): Boolean =
     WorksheetFileHook.getPanel(file).exists(!_.isRunEnabled)
@@ -144,7 +143,7 @@ object WorksheetFileHook {
     private def loadEvaluationResult(project: Project, file: VirtualFile, editor: EditorEx): Unit = {
       val evaluationResultOpt = WorksheetEditorPrinterFactory.loadWorksheetEvaluation(file)
       evaluationResultOpt.foreach {
-        case (result, ratio) if !result.isEmpty =>
+        case (result, ratio) if result.nonEmpty =>
           val viewer = WorksheetEditorPrinterFactory.createViewer(editor)
           val document = viewer.getDocument
 

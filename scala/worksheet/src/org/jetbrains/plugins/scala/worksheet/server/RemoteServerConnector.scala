@@ -12,7 +12,7 @@ import org.jetbrains.plugins.scala.compiler.data.worksheet.WorksheetArgs
 import org.jetbrains.plugins.scala.compiler.{CompilationProcess, RemoteServerConnectorBase, RemoteServerRunner}
 import org.jetbrains.plugins.scala.console.configuration.ScalaSdkJLineFixer
 import org.jetbrains.plugins.scala.console.configuration.ScalaSdkJLineFixer.JlineResolveResult
-import org.jetbrains.plugins.scala.extensions.LoggerExt
+import org.jetbrains.plugins.scala.extensions.{LoggerExt, invokeAndWait}
 import org.jetbrains.plugins.scala.lang.psi.api.ScFile
 import org.jetbrains.plugins.scala.project.ModuleExt
 import org.jetbrains.plugins.scala.project.settings.ScalaCompilerSettings
@@ -126,9 +126,13 @@ final class RemoteServerConnector(
         return
       }
 
-      WorksheetFileHook.updateStoppableProcess(originalFile, Some(() => worksheetProcess.stop()))
+      invokeAndWait {
+        WorksheetFileHook.updateStoppableProcess(originalFile, Some(() => worksheetProcess.stop()))
+      }
       worksheetProcess.addTerminationCallback { exception =>
-        WorksheetFileHook.updateStoppableProcess(originalFile, None)
+        invokeAndWait {
+          WorksheetFileHook.updateStoppableProcess(originalFile, None)
+        }
 
         val result = exception match {
           case Some(ex) => RemoteServerConnectorResult.ProcessTerminatedError(ex)

@@ -11,7 +11,6 @@ trait WorksheetEditorPrinter {
   def processLine(line: String): Boolean
   def flushBuffer(): Unit
   def close(): Unit
-  def scheduleWorksheetUpdate(): Unit
 
   /**
    * Handles unexpected exceptions.

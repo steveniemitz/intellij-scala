@@ -55,12 +55,15 @@ object CleanWorksheetAction {
     val psiFile: PsiFile = PsiDocumentManager.getInstance(project).getPsiFile(editor.getDocument)
     val viewer = WorksheetCache.getInstance(project).getViewer(editor)
 
-    if (psiFile == null || viewer == null) return
+    if (psiFile == null || viewer == null)
+      return
 
     val splitPane = viewer.getComponent.getParent
-    if (splitPane == null) return
+    if (splitPane == null)
+      return
     val parent = splitPane.getParent
-    if (parent == null && !ApplicationManager.getApplication.isUnitTestMode) return
+    if (parent == null && !ApplicationManager.getApplication.isUnitTestMode)
+      return
 
     invokeLater {
       inWriteAction {

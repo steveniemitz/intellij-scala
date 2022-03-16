@@ -6,6 +6,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiDocumentManager
+import com.intellij.util.concurrency.annotations.RequiresWriteLock
 import org.jetbrains.plugins.scala.extensions.{ThrowableExt, _}
 import org.jetbrains.plugins.scala.settings.ScalaProjectSettings
 import org.jetbrains.plugins.scala.worksheet.WorksheetBundle
@@ -72,6 +73,7 @@ abstract class WorksheetEditorPrinterBase(protected val originalEditor: Editor,
   private def getVirtualFile: VirtualFile =
     getScalaFile.getVirtualFile
 
+  @RequiresWriteLock
   protected def cleanFoldings(): Unit = {
     foldGroup.clearRegions()
     viewerFolding.runBatchFoldingOperation { () =>

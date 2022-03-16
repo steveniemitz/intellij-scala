@@ -5,7 +5,7 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.impl.EditorImpl
 import com.intellij.openapi.editor.{Document, Editor}
 import com.intellij.openapi.util.text.StringUtil
-import com.intellij.util.concurrency.annotations.RequiresEdt
+import com.intellij.util.concurrency.annotations.{RequiresEdt, RequiresWriteLock}
 import org.apache.commons.lang3.StringUtils
 import org.jetbrains.annotations.TestOnly
 import org.jetbrains.plugins.scala.extensions._
@@ -46,7 +46,7 @@ final class WorksheetEditorPrinterPlain private[printers](
   @volatile private var terminated = false
   override val processingTerminatedPromise: Promise[Unit] = Promise.apply()
   private def terminate(): Unit = {
-    debug("terminate")
+    //debug("terminate")
     flushBuffer()
     terminated = true
     processingTerminatedPromise.complete(Success(()))
@@ -60,11 +60,13 @@ final class WorksheetEditorPrinterPlain private[printers](
 
   override def getScalaFile: ScalaFile = file
 
-  override def scheduleWorksheetUpdate(): Unit = flushTimer.start()
-
   /** @param line single worksheet output line, currently expecting with '\n' in the end */
   override def processLine(line: String): Boolean = try myLock.locked {
-    firstLineAccepted = true
+    if (!firstLineAccepted) {
+      firstLineAccepted = true
+      //debug("first line accepted, starting flush timer")
+      flushTimer.start()
+    }
 
     //debug(s"processLine start: ${line.replaceAll("\n", " \\\\n ")}")
     //Thread.sleep(20) // for concurrency issue debugging
@@ -231,7 +233,7 @@ final class WorksheetEditorPrinterPlain private[printers](
   private def isResultEnd(line: String): Boolean =
     line.startsWith(ServiceMarkers.CHUNK_OUTPUT_END_MARKER)
 
-  @RequiresEdt
+  @RequiresWriteLock
   private def updateViewerDocumentTextWithPersistentScroll(
     viewerDocument: Document,
     text: CharSequence,

@@ -213,8 +213,10 @@ class WorksheetCompiler(
     val args = request match {
       case RunRepl(code, evaluatedElements) =>
         val replPrinter = printer.asInstanceOf[WorksheetEditorPrinterRepl]
-        replPrinter.updateMessagesConsumer(consumer)
-        replPrinter.updateEvaluatedElements(evaluatedElements)
+        replPrinter.updateStateBeforeNewRun(
+          consumer,
+          evaluatedElements
+        )
 
         val lastProcessedLine = WorksheetCache.getInstance(project).getLastProcessedIncremental(editor)
         val dropCachedReplInstance = lastProcessedLine.isEmpty

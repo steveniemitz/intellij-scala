@@ -12,7 +12,7 @@ import com.intellij.openapi.util.Key
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.util.io.BaseDataReader.SleepingPolicy
 import com.intellij.util.io.BaseOutputReader
-import org.jetbrains.plugins.scala.extensions.invokeLater
+import org.jetbrains.plugins.scala.extensions.{invokeAndWait, invokeLater}
 import org.jetbrains.plugins.scala.project._
 import org.jetbrains.plugins.scala.worksheet.actions.WorksheetFileHook
 import org.jetbrains.plugins.scala.worksheet.processor.WorksheetCompiler.{EvaluationCallback, WorksheetCompilerResult}
@@ -35,8 +35,11 @@ private object WorksheetCompilerLocalEvaluator {
 
         WorksheetFileHook.updateStoppableProcess(file, Some(() => processHandler.destroyProcess()))
         processHandler.addProcessListener(new ProcessAdapter {
-          override def processTerminated(event: ProcessEvent): Unit =
-            WorksheetFileHook.updateStoppableProcess(file, None)
+          override def processTerminated(event: ProcessEvent): Unit = {
+            invokeAndWait {
+              WorksheetFileHook.updateStoppableProcess(file, None)
+            }
+          }
         })
 
         processHandler.addProcessListener(processListener(callback, worksheetPrinter))

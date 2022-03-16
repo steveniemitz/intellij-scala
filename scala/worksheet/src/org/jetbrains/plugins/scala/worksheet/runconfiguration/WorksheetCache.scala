@@ -1,7 +1,5 @@
 package org.jetbrains.plugins.scala.worksheet.runconfiguration
 
-import java.io.File
-
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.{Editor, EditorFactory}
@@ -10,17 +8,19 @@ import com.intellij.openapi.util.io.FileUtil
 import com.intellij.util.containers.ContainerUtil
 import org.jetbrains.annotations.TestOnly
 import org.jetbrains.plugins.scala.worksheet.processor.WorksheetCompiler.CompilerMessagesCollector
+import org.jetbrains.plugins.scala.worksheet.runconfiguration.WorksheetCache.MagicFlag
 import org.jetbrains.plugins.scala.worksheet.ui.printers.{WorksheetEditorPrinter, WorksheetEditorPrinterRepl}
 
-import scala.jdk.CollectionConverters._
+import java.io.File
 import scala.collection.mutable
+import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Try}
 
 final class WorksheetCache extends Disposable {
 
-  private val allViewers      = ContainerUtil.createWeakMap[Editor, List[Editor]]()
-  private val allReplPrinters = ContainerUtil.createWeakMap[Editor, WorksheetEditorPrinter]()
-  private val patchedEditors  = ContainerUtil.createWeakMap[Editor, String]()
+  private val editorToViewer = ContainerUtil.createWeakMap[Editor, Editor]
+  private val editorToPrinter = ContainerUtil.createWeakMap[Editor, WorksheetEditorPrinter]
+  private val editorToMagicFlag  = ContainerUtil.createWeakMap[Editor, MagicFlag]
 
   private val Log: Logger = Logger.getInstance(getClass)
 
@@ -61,69 +61,52 @@ final class WorksheetCache extends Disposable {
     compilationInfo.get(filePath).map(_._1).getOrElse(-1)
 
   def getPrinter(inputEditor: Editor): Option[WorksheetEditorPrinter] =
-    Option(allReplPrinters.get(inputEditor))
+    Option(editorToPrinter.get(inputEditor))
 
-  def addPrinter(inputEditor: Editor, printer: WorksheetEditorPrinter): Unit =
-    allReplPrinters.put(inputEditor, printer)
+  def setPrinter(inputEditor: Editor, printer: WorksheetEditorPrinter): Unit =
+    editorToPrinter.put(inputEditor, printer)
 
   def removePrinter(inputEditor: Editor): Unit = {
-    val removed = allReplPrinters.remove(inputEditor)
+    val removed = editorToPrinter.remove(inputEditor)
     if (removed != null) {
       removed.close()
     }
   }
 
   def getLastProcessedIncremental(inputEditor: Editor): Option[Int] =
-    Option(allReplPrinters.get(inputEditor)).flatMap {
+    Option(editorToPrinter.get(inputEditor)).flatMap {
       case in: WorksheetEditorPrinterRepl => in.lastProcessedLine
       case _                              => None
     }
 
   def resetLastProcessedIncremental(inputEditor: Editor): Unit =
-    allReplPrinters.get(inputEditor) match {
+    editorToPrinter.get(inputEditor) match {
       case inc: WorksheetEditorPrinterRepl => inc.resetLastProcessedLine()
       case _                               =>
     }
 
-  def getPatchedFlag(editor: Editor): String = Option(patchedEditors.get(editor)).orNull
+  def getPatchedFlag(editor: Editor): Option[MagicFlag] =
+    Option(editorToMagicFlag.get(editor))
 
-  def setPatchedFlag(editor: Editor, flag: String): Unit =
-    patchedEditors.put(editor, flag)
+  def setPatchedFlag(editor: Editor, flag: MagicFlag): Unit =
+    editorToMagicFlag.put(editor, flag)
 
   def removePatchedFlag(editor: Editor): Unit =
-    patchedEditors.remove(editor)
+    editorToMagicFlag.remove(editor)
 
-  def getViewer(editor: Editor): Editor = {
-    val viewer = get(editor)
+  def getViewer(editor: Editor): Editor = synchronized {
+    val viewer = editorToViewer.get(editor)
 
     if (viewer != null && viewer.isDisposed || editor.isDisposed) {
-      synchronized {
-        allViewers.remove(editor)
-      }
-
-      return null
+      editorToViewer.remove(editor)
+      null
     }
-
-    viewer
+    else viewer
   }
 
-  def addViewer(viewer: Editor, editor: Editor): Unit =
+  def setViewer(editor: Editor, viewer: Editor): Unit =
     synchronized {
-      allViewers.get(editor) match {
-        case null =>
-          allViewers.put(editor, viewer :: Nil)
-        case list: List[Editor] =>
-          allViewers.put(editor, viewer :: list)
-      }
-    }
-
-  def disposeViewer(viewer: Editor, editor: Editor): Unit =
-    synchronized {
-      allViewers get editor match {
-        case null =>
-        case list: List[Editor] =>
-          allViewers.put(editor, list.filter(sViewer => sViewer != viewer))
-      }
+      editorToViewer.put(editor, viewer)
     }
 
   override def dispose(): Unit = {
@@ -131,7 +114,7 @@ final class WorksheetCache extends Disposable {
     invalidateViewers()
   }
 
-  private def logErrors[T](body: => T): Unit =
+  private def logExceptions[T](body: => T): Unit =
     Try(body) match {
       case Failure(exception) =>
         Log.error(exception)
@@ -140,30 +123,28 @@ final class WorksheetCache extends Disposable {
 
   private def invalidatePrinters(): Unit = {
     for {
-      printer <- allReplPrinters.asScala.values
-    } logErrors(printer.close())
-    allReplPrinters.clear()
+      printer <- editorToPrinter.asScala.values
+    } logExceptions(printer.close())
+    editorToPrinter.clear()
   }
 
   private def invalidateViewers(): Unit = {
     val factory = EditorFactory.getInstance()
     for {
-      editors <- allViewers.values.asScala
-      editor  <- editors
-      if !editor.isDisposed
-    } logErrors(factory.releaseEditor(editor))
-    allViewers.clear()
+      viewer <- editorToViewer.values.asScala
+      if !viewer.isDisposed
+    } logExceptions(factory.releaseEditor(viewer))
+    editorToViewer.clear()
   }
-
-  private def get(editor: Editor): Editor =
-    synchronized {
-      allViewers.get(editor) match {
-        case null => null
-        case list => list.headOption.orNull
-      }
-    }
 }
 
 object WorksheetCache {
   def getInstance(project: Project): WorksheetCache = project.getService(classOf[WorksheetCache])
+
+  //the purpose of this is unclear, previously a String was used with 2 possible magic values
+  sealed trait MagicFlag
+  object MagicFlag {
+    object MagicValue1 extends MagicFlag
+    object MagicValue2 extends MagicFlag
+  }
 }
