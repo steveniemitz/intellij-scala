@@ -1,22 +1,19 @@
-package org.jetbrains.plugins.scala
-package lang
-package parser
-package parsing
-package expressions
+package org.jetbrains.plugins.scala.lang.parser.parsing.expressions
 
 import org.jetbrains.annotations.Nls
+import org.jetbrains.plugins.scala.ScalaBundle
 import org.jetbrains.plugins.scala.lang.lexer.ScalaTokenTypes
+import org.jetbrains.plugins.scala.lang.parser.ScalaElementType
 import org.jetbrains.plugins.scala.lang.parser.parsing.builder.ScalaPsiBuilder
 
 import scala.annotation.tailrec
 
-/**
- * @author Alexander Podkhalyuzin
- *         Date: 06.03.2008
- */
-
 /*
- * Annmotation ::= '@' AnnotationExpr [nl]
+ * Scala 2.13:
+ * Annotation  ::= '@' SimpleType {ArgumentExprs}
+ *
+ * Effectively the same as:
+ * 'Annotation  ::= @' AnnotationExpr
  */
 object Annotation {
 
