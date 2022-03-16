@@ -6,9 +6,8 @@ import com.intellij.openapi.editor.impl.EditorImpl
 import com.intellij.openapi.editor.{Document, Editor}
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.util.concurrency.annotations.RequiresEdt
-import javax.swing.Timer
 import org.apache.commons.lang3.StringUtils
-import org.jetbrains.annotations.{CalledInAwt, TestOnly}
+import org.jetbrains.annotations.TestOnly
 import org.jetbrains.plugins.scala.extensions._
 import org.jetbrains.plugins.scala.lang.psi.api.ScalaFile
 import org.jetbrains.plugins.scala.worksheet.processor.WorksheetDefaultSourcePreprocessor
@@ -16,29 +15,42 @@ import org.jetbrains.plugins.scala.worksheet.processor.WorksheetDefaultSourcePre
 import org.jetbrains.plugins.scala.worksheet.ui.printers.WorksheetEditorPrinterBase.InputOutputFoldingInfo
 import org.jetbrains.plugins.scala.worksheet.ui.printers.WorksheetEditorPrinterPlain._
 
+import java.util.concurrent.locks.ReentrantLock
+import javax.swing.Timer
 import scala.collection.immutable.ArraySeq
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
+import scala.concurrent.Promise
+import scala.util.Success
 
 final class WorksheetEditorPrinterPlain private[printers](
   editor: Editor,
   viewer: Editor,
   file: ScalaFile
 ) extends WorksheetEditorPrinterBase(editor, viewer) {
-
-  private val myLock = new Object()
+  private val myLock = new ReentrantLock(false)
 
   // used to flush collected output if there is some long process generating running
   private val flushTimer = new Timer(WorksheetEditorPrinterFactory.IDLE_TIME.toMillis.toInt, _ => flushOnTimer())
 
   private val evaluatedChunks = ArrayBuffer[EvaluationChunk]()
 
-  private val currentOutputBuffer = new StringBuilder()
+  private val currentOutputBuffer = new mutable.StringBuilder()
   private var currentOutputNewLinesCount = 0
   private var currentResultStartLine: Option[String] = None
 
   private var cutoffPrinted = false
-  @volatile private var terminated = false
+  @volatile private var firstLineAccepted = false
   @volatile private var buffed = 0
+
+  @volatile private var terminated = false
+  override val processingTerminatedPromise: Promise[Unit] = Promise.apply()
+  private def terminate(): Unit = {
+    debug("terminate")
+    flushBuffer()
+    terminated = true
+    processingTerminatedPromise.complete(Success(()))
+  }
 
   @TestOnly
   lazy val viewerEditorStates: ArrayBuffer[ViewerEditorState] = ArrayBuffer.empty
@@ -51,19 +63,22 @@ final class WorksheetEditorPrinterPlain private[printers](
   override def scheduleWorksheetUpdate(): Unit = flushTimer.start()
 
   /** @param line single worksheet output line, currently expecting with '\n' in the end */
-  override def processLine(line: String): Boolean = try myLock.synchronized {
+  override def processLine(line: String): Boolean = try myLock.locked {
+    firstLineAccepted = true
+
     //debug(s"processLine start: ${line.replaceAll("\n", " \\\\n ")}")
     //Thread.sleep(20) // for concurrency issue debugging
     if (isTerminationLine(line)) {
-      flushBuffer()
-      terminated = true
+      terminate()
       return true
     }
 
     if (isResultStart(line)) {
       currentResultStartLine = Some(line)
     } else if (isResultEnd(line)) {
-      if (!isInited) init()
+      if (!isInited) {
+        init()
+      }
 
       WorksheetDefaultSourcePreprocessor.inputLinesRangeFromEnd(line) match {
         case Some((inputStartLine, inputEndLine)) =>
@@ -94,16 +109,19 @@ final class WorksheetEditorPrinterPlain private[printers](
     //debug(s"processLine end")
   }
 
-  override def internalError(ex: Throwable): Unit = myLock.synchronized {
-    flushBuffer()
+  override def internalError(ex: Throwable): Unit = myLock.locked {
+    terminate()
     super.internalError(ex)
-    terminated = true
     stopTimer()
   }
 
-  override def flushBuffer(): Unit = myLock.synchronized {
-    if (!isInited) init()
-    if (terminated) return
+  override def flushBuffer(): Unit = myLock.locked {
+    if (!isInited) {
+      init()
+    }
+    if (terminated) {
+      return
+    }
 
     stopTimer()
 
@@ -119,50 +137,65 @@ final class WorksheetEditorPrinterPlain private[printers](
   }
 
   @volatile
-  private var flushingInProcess = false
+  private var flushOnTimerInProcess = false
 
   // currently we re-render text on each mid-flush (~once per 1 second for long processes),
   // for now we are ok with this cause `renderText` proved to be quite a lightweight operation
   // Called from timer, so body invoked in EDT
-  @RequiresEdt
+  @RequiresEdt // it's not required, but expected to be called from EDT (which is used for Timer callback execution)
   private def flushOnTimer(): Unit = {
     //debug("flushOnTimer start")
-    if (terminated) {
+    if (!firstLineAccepted) {
+      //debug("flushOnTimer skip (no process output yet)")
+    }
+    else if (terminated) {
       //debug("flushOnTimer skip (printer is already terminated)")
     }
-    else if (flushingInProcess) {
-      //debug("flushOnTimer skip (flushing is already in process)")
+    else if (flushOnTimerInProcess) {
+      //debug("flushOnTimer skip (flushing on timer is already in process)")
     }
     else {
-      flushingInProcess = true
+      flushOnTimerInProcess = true
       executeOnPooledThread {
-        flushContentSync()
-        //debug("flushOnTimer end (flushed)")
-        flushingInProcess = false
+        //debug("flushOnTimer continue in pooled thread")
+        try {
+          flushContentSync()
+        } finally {
+          //debug("flushOnTimer end (flushed)")
+          flushOnTimerInProcess = false
+        }
       }
     }
   }
 
-  private def flushContentSync(): Unit = myLock.synchronized {
+  private def flushContentSync(): Unit = myLock.locked {
+    //debug("flushContentSync start")
     Log.assertTrue(
       !ApplicationManager.getApplication.isDispatchThread,
       "flushContent should not be called on EDT to avoid deadlocks"
     )
-    if (buffed == 0) return
 
-    val lastChunkOpt = buildIncompleteLastChunkOpt
-    val (text, foldings) = renderText(evaluatedChunks ++ lastChunkOpt)
-
-    val expandedFoldingsIds  = foldGroup.expandedRegionsIndexes
-    foldings.iterator.zipWithIndex.foreach { case (folding, idx) =>
-      if (expandedFoldingsIds.contains(idx))
-        folding.isExpanded = true
+    if (buffed == 0) {
+      //debug("flushContentSync end (nothing to flush)")
     }
+    else try {
+      val lastChunkOpt = buildIncompleteLastChunkOpt
+      val (text, foldings) = renderText(evaluatedChunks ++ lastChunkOpt)
 
-    invokeAndWait {
-      inWriteAction {
-        updateWithPersistentScroll(viewerDocument, text, foldings)
+
+      invokeAndWait {
+        val expandedFoldingsIds = foldGroup.indexesOfExpandedRegions
+        foldings.iterator.zipWithIndex.foreach { case (folding, idx) =>
+          if (expandedFoldingsIds.contains(idx))
+            folding.isExpanded = true
+        }
+
+        inWriteAction {
+          updateViewerDocumentTextWithPersistentScroll(viewerDocument, text, foldings)
+        }
       }
+    } finally {
+      //debug("flushContentSync end")
     }
   }
 
@@ -199,11 +232,19 @@ final class WorksheetEditorPrinterPlain private[printers](
     line.startsWith(ServiceMarkers.CHUNK_OUTPUT_END_MARKER)
 
   @RequiresEdt
-  private def updateWithPersistentScroll(document: Document, text: CharSequence, foldings: Iterable[InputOutputFoldingInfo]): Unit = {
+  private def updateViewerDocumentTextWithPersistentScroll(
+    viewerDocument: Document,
+    text: CharSequence,
+    foldings: Iterable[InputOutputFoldingInfo]
+  ): Unit = {
+    //def debugStatus(startOrEnd: String): Unit =
+    //  debug(s"updateViewerDocumentTextWithPersistentScroll $startOrEnd, text length ${text.length()}, foldings count: ${foldings.size}")
+    //debugStatus("start")
+
     val editorScroll = originalEditor.getScrollingModel.getVerticalScrollOffset
     val viewerScroll = worksheetViewer.getScrollingModel.getVerticalScrollOffset
 
-    simpleUpdate(document, text)
+    setDocumentTextAndCommit(viewerDocument, text)
 
     originalEditor.getScrollingModel.scrollVertically(editorScroll)
     worksheetViewer.getScrollingModel.scrollHorizontally(viewerScroll)
@@ -218,8 +259,10 @@ final class WorksheetEditorPrinterPlain private[printers](
       val actualFoldings = viewer.getFoldingModel.getAllFoldRegions.map { f =>
         FoldingDataForTests(f.getStartOffset, f.getEndOffset, f.getPlaceholderText, f.isExpanded)
       }
-      viewerEditorStates += ViewerEditorState(document.getText, actualFoldings.toSeq)
+      viewerEditorStates += ViewerEditorState(viewerDocument.getText, actualFoldings.toSeq)
     }
+
+    //debugStatus("end")
   }
 }
 

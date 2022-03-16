@@ -4,12 +4,11 @@ import com.intellij.openapi.editor.Editor
 import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.ui.content.MessageView
 import com.intellij.util.ui.UIUtil
-
-import javax.swing.SwingUtilities
 import org.jetbrains.plugins.scala.worksheet.actions.topmenu.RunWorksheetAction
 import org.jetbrains.plugins.scala.worksheet.integration.WorksheetIntegrationBaseTest.TestRunResult
 import org.junit.Assert.fail
 
+import javax.swing.SwingUtilities
 import scala.concurrent.Future
 import scala.concurrent.duration.{Duration, DurationInt}
 import scala.language.postfixOps
@@ -49,7 +48,9 @@ trait WorksheetItEvaluations {
 
 
   /**
-   * TODO: delete and override com.intellij.testFramework.UsefulTestCase#runInDispatchThread() instead
+   * NOTE: we might consider deleting and override com.intellij.testFramework.UsefulTestCase#runInDispatchThread() instead
+   * (this will require wrapping some code in tests with invokeAndWait)
+   *
    * Unit tests are run in EDT, so we can't just use [[scala.concurrent.Await.result]] - it will block EDT and lead to
    * all EDT events starving. So no code in "invokeLater" or "invokeLaterAndWait" etc... will be executed.
    * We must periodically flush EDT events to workaround this.

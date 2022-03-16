@@ -4,6 +4,8 @@ import org.jetbrains.annotations.TestOnly
 import org.jetbrains.plugins.scala.lang.psi.api.ScalaFile
 import org.jetbrains.plugins.scala.worksheet.ui.WorksheetDiffSplitters.SimpleWorksheetSplitter
 
+import scala.concurrent.Promise
+
 trait WorksheetEditorPrinter {
   def getScalaFile: ScalaFile
   def processLine(line: String): Boolean
@@ -20,4 +22,6 @@ trait WorksheetEditorPrinter {
 
   @TestOnly
   def diffSplitter: Option[SimpleWorksheetSplitter]
+
+  def processingTerminatedPromise: Promise[Unit]
 }

@@ -1,8 +1,6 @@
 package org.jetbrains.plugins.scala
 package worksheet.processor
 
-import java.io.{File, FileWriter}
-
 import com.intellij.compiler.impl.ExitStatus
 import com.intellij.compiler.progress.CompilerTask
 import com.intellij.openapi.application.ApplicationManager
@@ -15,7 +13,7 @@ import com.intellij.openapi.util.io.FileUtil
 import org.jetbrains.jps.incremental.messages.BuildMessage.Kind
 import org.jetbrains.jps.incremental.scala.{Client, DelegateClient}
 import org.jetbrains.plugins.scala.compiler.{CompileServerLauncher, JDK, ScalaCompileServerSettings}
-import org.jetbrains.plugins.scala.extensions.LoggerExt
+import org.jetbrains.plugins.scala.extensions.{LoggerExt, executionContext}
 import org.jetbrains.plugins.scala.lang.psi.api.ScalaFile
 import org.jetbrains.plugins.scala.project.{ModuleExt, ScalaSdkNotConfiguredException}
 import org.jetbrains.plugins.scala.settings.ScalaProjectSettings
@@ -28,9 +26,10 @@ import org.jetbrains.plugins.scala.worksheet.server.RemoteServerConnector.Args.{
 import org.jetbrains.plugins.scala.worksheet.server.RemoteServerConnector._
 import org.jetbrains.plugins.scala.worksheet.server._
 import org.jetbrains.plugins.scala.worksheet.settings.WorksheetExternalRunType.WorksheetPreprocessError
-import org.jetbrains.plugins.scala.worksheet.settings.{WorksheetFileSettings, _}
+import org.jetbrains.plugins.scala.worksheet.settings._
 import org.jetbrains.plugins.scala.worksheet.ui.printers.{WorksheetEditorPrinter, WorksheetEditorPrinterRepl}
 
+import java.io.{File, FileWriter}
 import scala.collection.mutable
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Promise, TimeoutException}
@@ -85,8 +84,8 @@ class WorksheetCompiler(
   }
 
   private def logCompileOnlyError(error: WorksheetCompilerResult.WorksheetCompilerError): Unit = {
-    import WorksheetCompiler.{WorksheetCompilerResult => WCR}
     import RemoteServerConnector.{RemoteServerConnectorResult => RSCR}
+    import WorksheetCompiler.{WorksheetCompilerResult => WCR}
     val exception = error match {
       case WCR.UnknownError(cause)                                     => Some(cause)
       case WCR.RemoteServerConnectorError(RSCR.UnexpectedError(cause)) => Some(cause)
@@ -235,7 +234,9 @@ class WorksheetCompiler(
               val plainArgs = args.asInstanceOf[PlainModeArgs]
               WorksheetCompilerLocalEvaluator.executeWorksheet(virtualFile, plainArgs.className, plainArgs.outputDir.getAbsolutePath)(callback, printer)(module)
             case _ =>
-              callback(WorksheetCompilerResult.CompiledAndEvaluated)
+              printer.processingTerminatedPromise.future.onComplete(_ => {
+                callback(WorksheetCompilerResult.CompiledAndEvaluated)
+              })(executionContext.appExecutionContext)
           }
         }
       case error: RemoteServerConnectorResult.UnhandledError          =>

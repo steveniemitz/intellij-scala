@@ -60,6 +60,7 @@ import java.lang.ref.Reference
 import java.lang.reflect.InvocationTargetException
 import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.locks.Lock
 import java.util.concurrent.{Callable, ScheduledFuture, TimeUnit, ConcurrentMap => JConcurrentMap, Future => JFuture}
 import java.util.regex.Pattern
 import java.util.{Arrays, Set => JSet}
@@ -1403,6 +1404,7 @@ package object extensions {
       override def run(): Unit = body
     }, modalityState)
 
+  @throws[ProcessCanceledException]
   def invokeAndWait[T](body: => T): T = {
     val result = new AtomicReference[T]()
     preservingControlFlow {
@@ -1411,6 +1413,7 @@ package object extensions {
     result.get()
   }
 
+  @throws[ProcessCanceledException]
   def invokeAndWait[T](modalityState: ModalityState)(body: => T): Unit =
     preservingControlFlow {
       ApplicationManager.getApplication.invokeAndWait((() => body): Runnable, modalityState)
@@ -1652,7 +1655,21 @@ package object extensions {
   }
 
   object executionContext {
+    //NOTE: we might also need backgroundExecutioContext,
+    // but com.intellij.openapi.application.impl.ApplicationImpl.ourThreadExecutorsService is inaccesible
     private val appExecutorService = AppExecutorUtil.getAppExecutorService
     implicit val appExecutionContext: ExecutionContextExecutorService = ExecutionContext.fromExecutorService(appExecutorService)
+  }
+
+  implicit class LockExt(private val lock: Lock) extends AnyVal {
+    def locked[T](body: => T): T = {
+      lock.lock()
+
+      val result =
+        try body
+        finally lock.unlock()
+
+      result
+    }
   }
 }

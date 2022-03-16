@@ -42,18 +42,6 @@ package object compilerReferences {
       override def run(indicator: ProgressIndicator): Unit = body(indicator)
     }
 
-  implicit class LockExt(private val lock: Lock) extends AnyVal {
-    def locked[T](body: => T): T = {
-      lock.lock()
-
-      val result =
-        try body
-        finally lock.unlock()
-
-      result
-    }
-  }
-
   implicit class CompilationInfoExt(private val info: CompilationInfo) extends AnyVal {
     def affectedModules(project: Project): Set[Module] = {
       val manager = ModuleManager.getInstance(project)

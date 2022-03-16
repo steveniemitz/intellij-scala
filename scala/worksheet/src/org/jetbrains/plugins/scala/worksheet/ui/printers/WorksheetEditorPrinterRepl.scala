@@ -27,6 +27,8 @@ import org.jetbrains.plugins.scala.worksheet.ui.printers.WorksheetEditorPrinterB
 import org.jetbrains.plugins.scala.worksheet.ui.printers.repl.{PrintChunk, QueuedPsi}
 
 import scala.collection.mutable
+import scala.concurrent.Promise
+import scala.util.Success
 import scala.util.matching.Regex
 
 //noinspection HardCodedStringLiteral
@@ -62,28 +64,36 @@ final class WorksheetEditorPrinterRepl private[printers](
     psiToProcess ++= evaluatedElements
   }
 
-  private val chunkOutputBuffer = new StringBuilder()
+  private val chunkOutputBuffer = new mutable.StringBuilder()
   private var chunkIsBeingProcessed = false
+
+  override val processingTerminatedPromise: Promise[Unit] = Promise.apply()
 
   // FIXME: now all return boolean values are not processed anywhere and do not mean anything, remove or handle
   // FIXME: handle exceptions in process line
   // TODO: better to abstract away from "line string" to some kind of message / event, wrap the line
   //  we already WorksheetEditorPrinterRepl.ReplMessage.unapply, could generalize over all type of output
   override def processLine(line: String): Boolean = chunkOutputBuffer.synchronized {
-    if (!isInited) init()
+    if (!isInited) {
+      init()
+    }
     //debug(s"line: '" + line.replaceAll("[\n\r]", "\\\\n ") + "'")
 
     val command = line.trim
     command match {
       case ReplStart =>
         prepareViewerDocument()
-        if (lastProcessedLine.isEmpty)
-          cleanFoldingsLater()
+        if (lastProcessedLine.isEmpty) {
+          invokeLater {
+            cleanFoldings()
+          }
+        }
         chunkOutputBuffer.clear()
         false
       case ReplEnd   =>
         flushBuffer()
         updateLastLineMarker()
+        processingTerminatedPromise.complete(Success(()))
         true
 
       case ReplChunkStart =>
@@ -126,7 +136,7 @@ final class WorksheetEditorPrinterRepl private[printers](
     inWriteCommandAction {
       //debug(s"cleanViewer: $fromLineIdx")
       if (fromLineIdx == 0) {
-        simpleUpdate(viewerDocument, "")
+        setDocumentTextAndCommit(viewerDocument, "")
         cleanFoldings()
       } else {
         val start = (viewerDocument.getLineStartOffset(fromLineIdx) - 1).max(0) // capture previous new line as well

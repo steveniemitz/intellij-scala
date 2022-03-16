@@ -1,29 +1,29 @@
 package org.jetbrains.plugins.scala
 package worksheet.ui
 
-import java.util
-
 import com.intellij.openapi.editor.ex.{FoldingListener, FoldingModelEx}
 import com.intellij.openapi.editor.{Document, Editor, FoldRegion}
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.newvfs.FileAttribute
+import com.intellij.util.concurrency.annotations.{RequiresReadLock, RequiresWriteLock}
 import org.jetbrains.plugins.scala.macroAnnotations.Measure
 import org.jetbrains.plugins.scala.project.ProjectExt
 import org.jetbrains.plugins.scala.worksheet.ui.WorksheetDiffSplitters.{DiffMapping, SimpleWorksheetSplitter}
 import org.jetbrains.plugins.scala.worksheet.ui.WorksheetFoldGroup._
+import org.jetbrains.plugins.scala.worksheet.ui.util.SimpleDebugOps
 import org.jetbrains.plugins.scala.worksheet.utils.FileAttributeUtilCache
 
+import java.util
 import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer
 
 final class WorksheetFoldGroup(
   private val viewerEditor: Editor, // left editor
   private val originalEditor: Editor, // right editor
   project: Project,
   private val splitter: Option[SimpleWorksheetSplitter]
-) {
+) extends SimpleDebugOps {
 
   import FoldRegionSerializer._
 
@@ -33,9 +33,11 @@ final class WorksheetFoldGroup(
   private val _regions = mutable.ArrayBuffer[FoldRegionInfo]()
   private val unfolded = new util.TreeMap[Int, Int]()
 
+  @RequiresReadLock
   def foldedLinesCount: Int = _regions.map(_.spaces).sum
 
-  def expandedRegionsIndexes: Seq[Int] = _regions.iterator.zipWithIndex.filter(_._1.expanded).map(_._2).toSeq
+  @RequiresReadLock
+  def indexesOfExpandedRegions: Seq[Int] = _regions.iterator.zipWithIndex.filter(_._1.expanded).map(_._2).toSeq
 
   def left2rightOffset(left: Int): Int = {
     val key: Int = unfolded floorKey left
@@ -47,6 +49,7 @@ final class WorksheetFoldGroup(
     }
   }
 
+  @RequiresWriteLock
   /**
    * @param foldStartOffset start of the range to fold in the viewerEditor
    * @param foldEndOffset   end of the range to fold in the viewerEditor
@@ -69,13 +72,18 @@ final class WorksheetFoldGroup(
     }
 
     val region = foldingModel.createFoldRegion(foldStartOffset, foldEndOffset, placeholder, null, false)
-    if (region == null) return //something went wrong
+    if (region == null)
+      return //something went wrong
 
     region.setExpanded(isExpanded)
-    _regions += FoldRegionInfo(region, leftEndOffset, leftContentLines, spaces, region.isExpanded)
+    val regionInfo = FoldRegionInfo(region, leftEndOffset, leftContentLines, spaces, region.isExpanded)
+    //debug(s"adding region: ${regionInfo.toString.replace("\n", "\\n")}")
+    _regions += regionInfo
   }
 
+  @RequiresWriteLock
   def clearRegions(): Unit = {
+    //debug(s"clearRegions")
     _regions.clear()
     unfolded.clear()
     splitter.foreach(_.clear())
@@ -93,6 +101,7 @@ final class WorksheetFoldGroup(
     addRegion(folding)(start, end, leftEndLine, leftSideLength, spaces, expanded)
   }
 
+  @RequiresWriteLock
   def expand(regionIdx: Int): Boolean =
     _regions.lift(regionIdx) match {
       case Some(region) => expand(region.region)
@@ -108,6 +117,7 @@ final class WorksheetFoldGroup(
   def installOn(model: FoldingModelEx): Unit =
     model.addListener(new WorksheetFoldRegionListener(this), project.unloadAwareDisposable)
 
+  @RequiresReadLock
   def initMappings(): Unit = {
     val (mappings, _, _) = traverseRegions(null)
     splitter.foreach(_.update(mappings))
@@ -117,9 +127,15 @@ final class WorksheetFoldGroup(
   }
 
   private def traverseAndChange(target: FoldRegion, expand: Boolean): Boolean = {
-    val (mappings, targetInfo, _) = traverseRegions(target)
+    val (mappings, targetInfoOpt, _) = traverseRegions(target)
 
-    if (targetInfo == null || targetInfo.expanded == expand) return false
+    val targetInfo: FoldRegionInfo = targetInfoOpt match {
+      case Some(value) => value
+      case _ =>
+        return false
+    }
+    if (targetInfo.expanded == expand)
+      return false
 
     splitter.foreach(_.update(mappings))
 
@@ -130,9 +146,11 @@ final class WorksheetFoldGroup(
   }
 
   @Measure
-  private def traverseRegions(target: FoldRegion): (Iterable[DiffMapping], FoldRegionInfo, Int) = {
-    val emptyResult: (Seq[DiffMapping], FoldRegionInfo, Int) = (Seq.empty, null, 0)
-    if (_regions.isEmpty) return emptyResult
+  @RequiresReadLock
+  private def traverseRegions(target: FoldRegion): (Iterable[DiffMapping], Option[FoldRegionInfo], Int) = {
+    val emptyResult: (Seq[DiffMapping], Option[FoldRegionInfo], Int) = (Seq.empty, None, 0)
+    if (_regions.isEmpty)
+      return emptyResult
 
     def numbers(reg: FoldRegionInfo, stored: Int): DiffMapping = {
       val leftEndOffset = reg.leftEndOffset - 1
@@ -145,10 +163,10 @@ final class WorksheetFoldGroup(
     _regions.foldLeft(emptyResult) { case (acc@(res, currentRegion, offset), nextRegion) =>
       val accNew = if (nextRegion.region == target) {
         if (nextRegion.expanded) {
-          (res, nextRegion, offset)
+          (res, Some(nextRegion), offset)
         } else {
           val resUpdated = res :+ numbers(nextRegion, offset)
-          (resUpdated, nextRegion, offset + nextRegion.spaces)
+          (resUpdated, Some(nextRegion), offset + nextRegion.spaces)
         }
       } else if (nextRegion.expanded) {
         val resUpdated = res :+ numbers(nextRegion, offset)
@@ -279,6 +297,7 @@ object WorksheetFoldGroup {
       document.getLineNumber(offset.min(document.getTextLength))
   }
 
+  @RequiresReadLock
   def save(file: VirtualFile, group: WorksheetFoldGroup): Unit = {
     if (!file.isValid) return
 

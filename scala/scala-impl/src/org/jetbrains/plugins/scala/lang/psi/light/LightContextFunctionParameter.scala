@@ -5,20 +5,20 @@ import com.intellij.psi.impl.light.LightElement
 import com.intellij.psi.impl.source.DummyHolderFactory
 import com.intellij.psi.{PsiElement, PsiFile, PsiManager, PsiTypeElement}
 import org.jetbrains.plugins.scala.Scala3Language
-import org.jetbrains.plugins.scala.findUsages.compilerReferences.LockExt
+import org.jetbrains.plugins.scala.extensions.LockExt
 import org.jetbrains.plugins.scala.lang.psi.api.ScalaPsiElement
 import org.jetbrains.plugins.scala.lang.psi.api.base.types.ScTypeElement
 import org.jetbrains.plugins.scala.lang.psi.api.expr.ScExpression
 import org.jetbrains.plugins.scala.lang.psi.api.statements.params.ScParameter
-import org.jetbrains.plugins.scala.lang.psi.types.api.{TypeParameterType, UndefinedType, Variance}
+import org.jetbrains.plugins.scala.lang.psi.types.api.{TypeParameterType, UndefinedType}
 import org.jetbrains.plugins.scala.lang.psi.types.recursiveUpdate.AfterUpdate.{ProcessSubtypes, ReplaceWith}
 import org.jetbrains.plugins.scala.lang.psi.types.recursiveUpdate.ScSubstitutor
 import org.jetbrains.plugins.scala.lang.psi.types.result.TypeResult
 import org.jetbrains.plugins.scala.lang.psi.types.{ScAbstractType, ScType}
 
 import java.util.concurrent.locks.ReentrantLock
-import scala.reflect.ClassTag
 import scala.collection.mutable
+import scala.reflect.ClassTag
 
 /**
  * Synthetic parameters of context-function types, used in implicit search.

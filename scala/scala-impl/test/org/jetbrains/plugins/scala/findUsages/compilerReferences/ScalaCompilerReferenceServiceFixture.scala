@@ -1,9 +1,4 @@
-package org.jetbrains.plugins.scala
-package findUsages
-package compilerReferences
-
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.locks.{Condition, Lock, ReentrantLock}
+package org.jetbrains.plugins.scala.findUsages.compilerReferences
 
 import com.intellij.openapi.compiler.CompilerMessageCategory
 import com.intellij.openapi.module.Module
@@ -13,12 +8,16 @@ import com.intellij.testFramework.{CompilerTester, PsiTestUtil}
 import org.jetbrains.plugins.scala.base.ScalaSdkOwner
 import org.jetbrains.plugins.scala.base.libraryLoaders.{HeavyJDKLoader, LibraryLoader, ScalaSDKLoader}
 import org.jetbrains.plugins.scala.debugger.ScalaCompilerTestBase
+import org.jetbrains.plugins.scala.extensions.LockExt
 import org.jetbrains.plugins.scala.project._
+import org.jetbrains.plugins.scala.{LatestScalaVersions, ScalaVersion, SlowTests}
 import org.junit.Assert.{assertNotSame, fail}
 import org.junit.experimental.categories.Category
 
-import scala.jdk.CollectionConverters._
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.locks.{Condition, Lock, ReentrantLock}
 import scala.collection.mutable
+import scala.jdk.CollectionConverters._
 import scala.reflect.ClassTag
 import scala.util.control.NonFatal
 

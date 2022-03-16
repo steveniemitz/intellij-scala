@@ -12,10 +12,11 @@ import org.jetbrains.plugins.scala.worksheet.WorksheetBundle
 import org.jetbrains.plugins.scala.worksheet.ui.WorksheetDiffSplitters.SimpleWorksheetSplitter
 import org.jetbrains.plugins.scala.worksheet.ui.WorksheetFoldGroup
 import org.jetbrains.plugins.scala.worksheet.ui.printers.WorksheetEditorPrinterBase.InputOutputFoldingInfo
+import org.jetbrains.plugins.scala.worksheet.ui.util.SimpleDebugOps
 
 abstract class WorksheetEditorPrinterBase(protected val originalEditor: Editor,
                                           protected val worksheetViewer: Editor)
-  extends WorksheetEditorPrinter {
+  extends WorksheetEditorPrinter with SimpleDebugOps {
 
   protected implicit val project: Project = originalEditor.getProject
 
@@ -26,10 +27,7 @@ abstract class WorksheetEditorPrinterBase(protected val originalEditor: Editor,
 
   protected lazy val foldGroup = new WorksheetFoldGroup(worksheetViewer, originalEditor, project, getWorksheetSplitter)
 
-  private var inited = false
-
-  protected def debug(obj: Any): Unit =
-    println(s"[${Thread.currentThread.getId}] $obj")
+  @volatile private var inited = false
 
   override def internalError(ex: Throwable): Unit =
     invokeLater {
@@ -38,7 +36,7 @@ abstract class WorksheetEditorPrinterBase(protected val originalEditor: Editor,
         if (alreadyContainsInternalErrors(viewerDocument)) {
           simpleAppend(viewerDocument, "\n" + fullErrorMessage)
         } else {
-          simpleUpdate(viewerDocument, fullErrorMessage)
+          setDocumentTextAndCommit(viewerDocument, fullErrorMessage)
         }
       }
     }
@@ -73,10 +71,6 @@ abstract class WorksheetEditorPrinterBase(protected val originalEditor: Editor,
 
   private def getVirtualFile: VirtualFile =
     getScalaFile.getVirtualFile
-
-  protected def cleanFoldingsLater(): Unit = invokeLater {
-    cleanFoldings()
-  }
 
   protected def cleanFoldings(): Unit = {
     foldGroup.clearRegions()
@@ -125,12 +119,17 @@ abstract class WorksheetEditorPrinterBase(protected val originalEditor: Editor,
   protected def isInited: Boolean = inited
 
   protected def init(): Unit = {
+    //debug("init")
     inited = true
 
     foldGroup.installOn(viewerFolding)
     WorksheetEditorPrinterFactory.synch(originalEditor, worksheetViewer, getWorksheetSplitter, Some(foldGroup))
 
-    cleanFoldingsLater()
+    invokeLater {
+      inWriteAction {
+        cleanFoldings()
+      }
+    }
   }
 
   protected def buildNewLines(count: Int): String = StringUtil.repeatSymbol('\n', count)
@@ -140,7 +139,7 @@ abstract class WorksheetEditorPrinterBase(protected val originalEditor: Editor,
     PsiDocumentManager.getInstance(project).commitDocument(doc)
   }
 
-  protected def simpleUpdate(document: Document, text: CharSequence): Unit = {
+  protected def setDocumentTextAndCommit(document: Document, text: CharSequence): Unit = {
     document.setText(text)
     commitDocument(document)
   }
