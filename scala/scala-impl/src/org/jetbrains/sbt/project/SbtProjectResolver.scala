@@ -151,7 +151,7 @@ class SbtProjectResolver extends ExternalSystemProjectResolver[SbtExecutionSetti
       val structureFilePath = normalizePath(structureFile)
 
       val dumper = new SbtStructureDump()
-      activeProcessDumper = Option(dumper)
+      activeProcessDumper = Some(dumper)
 
       val messageResult: Try[BuildMessages] = {
         if (useShellImport) {
@@ -170,7 +170,8 @@ class SbtProjectResolver extends ExternalSystemProjectResolver[SbtExecutionSetti
           dumper.dumpFromProcess(
             projectRoot, structureFilePath, options,
             settings.vmExecutable, settings.vmOptions, settings.environment,
-            sbtLauncher, sbtStructureJar, settings.preferScala2)
+            sbtLauncher, sbtStructureJar, settings.preferScala2
+          )
         }
       }
       activeProcessDumper = None
@@ -195,11 +196,14 @@ class SbtProjectResolver extends ExternalSystemProjectResolver[SbtExecutionSetti
         }
 
         tried.recoverWith { case error =>
-          val exceptions = messages.exceptions.map(_.getLocalizedMessage).mkString("\n")
-          val errorMsgs = messages.errors.map(_.getMessage).mkString("\n")
-          val message = error.getMessage + "\n" +
-            exceptions + (if (exceptions.nonEmpty) "\n" else "") +
-            errorMsgs
+          val exceptionMessagesText = messages.exceptions.map(_.getLocalizedMessage).mkString("\n")
+          val errorMessagesText = messages.errors.map(_.getMessage).mkString("\n")
+          val message = Seq(
+            error.getMessage,
+            exceptionMessagesText,
+            errorMessagesText,
+          ).filter(_.nonEmpty).mkString("\n")
+
           Failure(new Exception(message, error.getCause))
         }
       }

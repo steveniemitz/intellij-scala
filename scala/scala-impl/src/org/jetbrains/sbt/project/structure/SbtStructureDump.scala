@@ -25,6 +25,7 @@ import java.nio.charset.Charset
 import java.util.UUID
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
+import scala.collection.mutable
 import scala.concurrent.Future
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.jdk.CollectionConverters._
@@ -39,7 +40,7 @@ class SbtStructureDump {
   private val MaxImportDurationInUnitTests: FiniteDuration = 10.minutes
 
   // in failed tests we would like to see sbt process output
-  private val processOutputBuilder = new StringBuilder
+  private val processOutputBuilder = new mutable.StringBuilder
   def processOutput: String = processOutputBuilder.mkString
 
   def cancel(): Unit = cancellationFlag.set(true)
@@ -262,7 +263,8 @@ class SbtStructureDump {
         (typ, reporter) match {
           case (OutputType.StdErr, reporter: ExternalSystemNotificationReporter) =>
             reporter.logErr(text)
-          case _ => reporter.log(text)
+          case _ =>
+            reporter.log(text)
         }
       }
     }
@@ -340,9 +342,12 @@ object SbtStructureDump {
   private def reportEvent(messages: BuildMessages,
                           reporter: BuildReporter,
                           text: String): BuildMessages = {
-
-    if (ApplicationManager.getApplication.isUnitTestMode && (text.startsWith("[warn]") || text.startsWith("[error]")))
+    if (ApplicationManager.getApplication.isUnitTestMode && (text.startsWith("[warn]") || text.startsWith("[error]"))) {
+      //NOTE: this is a little bit exhaustive because we already collect all process output in tests
+      //in `processOutputBuilder` and print it in case the import has failed
+      //Though this print has an advantage: you can see the output before the test has failed
       System.err.println(text)
+    }
 
     if (text.startsWith("[error] Total time")) {
       val msg = SbtBundle.message("sbt.task.failed.see.log.for.details")

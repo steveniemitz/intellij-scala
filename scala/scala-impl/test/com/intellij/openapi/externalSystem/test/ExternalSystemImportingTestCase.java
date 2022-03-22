@@ -415,6 +415,7 @@ public abstract class ExternalSystemImportingTestCase extends ExternalSystemTest
 
     if (!error.isNull()) {
       String failureMsg = "Import failed: " + error.get().first;
+      failureMsg += "\n!!! See LOG for the SBT process output !!!";
       if (StringUtil.isNotEmpty(error.get().second)) {
         failureMsg += "\nError details: \n" + error.get().second;
       }
