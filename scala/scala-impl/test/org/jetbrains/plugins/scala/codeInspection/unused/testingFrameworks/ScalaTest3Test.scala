@@ -36,4 +36,7 @@ class ScalaTest3Test extends ScalaUnusedDeclarationInspectionTestBase with Libra
        |}
        |""".stripMargin
   )
+
+    def test_ref_spec(): Unit = throw new Exception
+
 }

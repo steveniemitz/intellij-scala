@@ -51,6 +51,8 @@ abstract class ScalaTestingTestCase
     with ScalaSdkOwner
     with TestOutputMarkers {
 
+  override def useCompileServer: Boolean = false
+
   protected def configurationProducer: RunConfigurationProducer[_]
 
   override def runInDispatchThread(): Boolean = false

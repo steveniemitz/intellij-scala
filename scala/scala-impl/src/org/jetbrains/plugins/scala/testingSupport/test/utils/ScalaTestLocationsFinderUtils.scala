@@ -2,7 +2,11 @@ package org.jetbrains.plugins.scala.testingSupport.test.utils
 
 import com.intellij.openapi.progress.ProgressManager
 import org.jetbrains.plugins.scala.lang.psi.api.expr._
+import org.jetbrains.plugins.scala.lang.psi.api.statements.ScFunctionDefinition
+import org.jetbrains.plugins.scala.lang.psi.api.toplevel.ScNamedElement
 import org.jetbrains.plugins.scala.lang.psi.api.toplevel.templates.ScTemplateBody
+import org.jetbrains.plugins.scala.lang.psi.api.toplevel.typedef.{ScMember, ScObject}
+import org.jetbrains.plugins.scala.testingSupport.test.TestConfigurationUtil.ScalaTestRefSpecUtil.RefSpecName
 
 private[testingSupport]
 object ScalaTestLocationsFinderUtils {
@@ -48,4 +52,18 @@ object ScalaTestLocationsFinderUtils {
     val result = inner(constructorExpressions)
     result
   }
+
+  def collectTestLocationsForRefSpec(body: ScTemplateBody): Seq[ScNamedElement] = {
+
+    def collectTestLocationsForRefSpecInMembers(members: Seq[ScMember]): Seq[ScNamedElement] =
+      members
+        .collect { case scNamedElement@RefSpecName(_) => scNamedElement }
+        .collect {
+          case f: ScFunctionDefinition => Seq(f)
+          case o: ScObject => o +: collectTestLocationsForRefSpecInMembers(o.members)
+        }.flatten
+
+    collectTestLocationsForRefSpecInMembers(body.members)
+  }
+
 }

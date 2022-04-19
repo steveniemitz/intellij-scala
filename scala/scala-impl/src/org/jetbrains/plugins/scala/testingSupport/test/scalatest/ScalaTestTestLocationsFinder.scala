@@ -7,6 +7,7 @@ import org.jetbrains.plugins.scala.lang.psi.api.toplevel.templates.ScTemplateBod
 import org.jetbrains.plugins.scala.lang.psi.api.toplevel.typedef.ScTypeDefinition
 import org.jetbrains.plugins.scala.macroAnnotations.CachedInUserData
 import org.jetbrains.plugins.scala.testingSupport.test.utils.ScalaTestLocationsFinderUtils
+import org.jetbrains.plugins.scala.testingSupport.test.utils.ScalaTestLocationsFinderUtils.collectTestLocationsForRefSpec
 import org.scalatest.finders._
 
 
@@ -51,6 +52,7 @@ object ScalaTestTestLocationsFinder {
       case _: FreeSpecFinder    => Some(freeSpecTestLocations(body))
       case _: PropSpecFinder    => Some(propSpecTestLocations(body))
       case _: FeatureSpecFinder => Some(featureSpecTestLocations(body))
+      case _: SpecFinder        => Some(collectTestLocationsForRefSpec(body))
       case _                    => None
     }
   }
